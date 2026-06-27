@@ -12,6 +12,7 @@ import dev.stele.cli.commands.IngestCodeGraphCommand
 import dev.stele.cli.commands.IngestCommand
 import dev.stele.cli.commands.IngestDocsCommand
 import dev.stele.cli.commands.IngestSymbolsCommand
+import dev.stele.cli.commands.IngestWebCommand
 import dev.stele.cli.commands.McpCommand
 import dev.stele.cli.commands.ReviewCommand
 import dev.stele.cli.commands.InitCommand
@@ -33,7 +34,7 @@ fun main(args: Array<String>) =
             InitCommand(),
             StatsCommand(),
             IngestCommand().subcommands(
-                IngestCodeCommand(), IngestSymbolsCommand(), IngestDocsCommand(),
+                IngestCodeCommand(), IngestSymbolsCommand(), IngestDocsCommand(), IngestWebCommand(),
                 IngestCodeGraphCommand(), IngestAstIndexCommand(),
             ),
             BuildOntologyCommand(),

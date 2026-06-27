@@ -58,9 +58,30 @@ private class Term(val regex: Regex, val conceptId: String)
  * This grounds concepts in the team's *product language*: after it,
  * `concept_context` returns the product prose alongside the code.
  */
+/** One source document feeding the linker: a stable ref, a display name, and markdown-ish content (# headings). */
+private data class RawDoc(val ref: String, val name: String, val content: String)
+
 fun ingestDocs(store: GraphStore, rootArg: String): DocsIngestResult {
     val root = File(rootArg).absoluteFile.normalize()
     val rootPath = root.toPath()
+    val raws = walkDocs(root).mapNotNull { file ->
+        val content = runCatching { file.readText() }.getOrNull() ?: return@mapNotNull null
+        RawDoc(rootPath.relativize(file.toPath()).toString().replace('\\', '/'), file.name, content)
+    }.toList()
+    return linkDocs(store, raws, "docs")
+}
+
+/**
+ * The *other* connectors path: ingest external pages (any URL) as product docs — fetch each, strip HTML
+ * to text (keeping headings), and link to concepts exactly like local Markdown. This is how Jira /
+ * Confluence / any docs site feeds the concept spine alongside code.
+ */
+fun ingestWeb(store: GraphStore, urls: List<String>): DocsIngestResult {
+    val raws = urls.mapNotNull { url -> fetchUrl(url)?.let { RawDoc(url, pageName(url), htmlToText(it)) } }
+    return linkDocs(store, raws, "web")
+}
+
+private fun linkDocs(store: GraphStore, raws: List<RawDoc>, source: String): DocsIngestResult {
     val vocab = buildVocabulary(store.conceptVocabulary())
     if (vocab.isEmpty()) return DocsIngestResult(0, 0, 0, 0, 0, 0)
 
@@ -71,11 +92,8 @@ fun ingestDocs(store: GraphStore, rootArg: String): DocsIngestResult {
     var sections = 0
     var links = 0
 
-    for (file in walkDocs(root)) {
-        val rel = rootPath.relativize(file.toPath()).toString().replace('\\', '/')
-        val content = runCatching { file.readText() }.getOrNull() ?: continue
-
-        for ((idx, section) in splitSections(content).withIndex()) {
+    for (raw in raws) {
+        for ((idx, section) in splitSections(raw.content).withIndex()) {
             val (heading, body) = section
             val hits = LinkedHashMap<String, Boolean>() // conceptId -> matched in heading (strong)
             for (term in vocab) {
@@ -86,17 +104,17 @@ fun ingestDocs(store: GraphStore, rootArg: String): DocsIngestResult {
             }
             if (hits.isEmpty()) continue
 
-            val title = if (heading == INTRO) file.name else heading
+            val title = if (heading == INTRO) raw.name else heading
             val anchor = if (heading == INTRO) "intro-$idx" else slug(heading)
             val docId = store.addArtifact(
                 kind = ArtifactKind.DOC,
                 layer = Layer.PRODUCT,
-                source = "docs",
-                ref = "$rel#$anchor",
+                source = source,
+                ref = "${raw.ref}#$anchor",
                 title = title,
                 body = body.take(2000),
             )
-            docs.add(rel)
+            docs.add(raw.ref)
             sections++
 
             for ((conceptId, strong) in hits) {
@@ -106,7 +124,7 @@ fun ingestDocs(store: GraphStore, rootArg: String): DocsIngestResult {
                     type = EdgeType.DESCRIBES,
                     source = EdgeSource.DETERMINISTIC,
                     confidence = if (strong) 0.9 else 0.6,
-                    evidence = listOf("docs:$rel"),
+                    evidence = listOf("$source:${raw.ref}"),
                     status = EdgeStatus.PROPOSED,
                 )
                 links++
@@ -131,7 +149,7 @@ fun ingestDocs(store: GraphStore, rootArg: String): DocsIngestResult {
                 val ruleId = store.addArtifact(
                     kind = ArtifactKind.RULE,
                     layer = Layer.PRODUCT,
-                    source = "docs",
+                    source = source,
                     ref = "rule:" + Integer.toHexString(sentence.hashCode()),
                     title = sentence.take(160),
                     body = sentence,
@@ -144,7 +162,7 @@ fun ingestDocs(store: GraphStore, rootArg: String): DocsIngestResult {
                         type = EdgeType.CONSTRAINS,
                         source = EdgeSource.INFERRED,
                         confidence = 0.6,
-                        evidence = listOf("docs:$rel"),
+                        evidence = listOf("$source:${raw.ref}"),
                         status = EdgeStatus.PROPOSED,
                     )
                 }
@@ -243,3 +261,44 @@ private fun walkDocs(dir: File): Sequence<File> = sequence {
 
 private fun slug(s: String): String =
     s.lowercase().replace(NON_SLUG, "-").trim('-').take(60).ifBlank { "section" }
+
+// --- web source: fetch a URL, strip HTML to markdown-ish text (dependency-free) ---
+
+private fun pageName(url: String): String =
+    url.substringBefore('?').trimEnd('/').substringAfterLast('/').ifBlank { url }
+
+private fun fetchUrl(url: String): String? = runCatching {
+    val client = java.net.http.HttpClient.newBuilder()
+        .followRedirects(java.net.http.HttpClient.Redirect.NORMAL)
+        .connectTimeout(java.time.Duration.ofSeconds(15))
+        .build()
+    val req = java.net.http.HttpRequest.newBuilder(java.net.URI.create(url))
+        .header("User-Agent", "stele/0.1 (docs ingest)")
+        .timeout(java.time.Duration.ofSeconds(30))
+        .GET().build()
+    val resp = client.send(req, java.net.http.HttpResponse.BodyHandlers.ofString())
+    if (resp.statusCode() in 200..299) resp.body() else null
+}.getOrNull()
+
+private val SCRIPT_STYLE = Regex("(?is)<(script|style|noscript|head)[^>]*>.*?</\\1>")
+private val H_TAG = Regex("(?is)<h([1-6])[^>]*>(.*?)</h\\1>")
+private val LI_TAG = Regex("(?i)<li[^>]*>")
+private val BLOCK_END = Regex("(?i)</(p|div|section|article|tr|li|h[1-6])>|<br\\s*/?>")
+private val ANY_TAG = Regex("<[^>]+>")
+private val MANY_NL = Regex("\\n{3,}")
+
+/** Crude, dependency-free HTML → text: keep headings as markdown `#` so sections + concept matching work. */
+private fun htmlToText(html: String): String {
+    if (!html.contains('<')) return html // already plain text / markdown
+    var s = SCRIPT_STYLE.replace(html, " ")
+    s = H_TAG.replace(s) { m -> "\n" + "#".repeat(m.groupValues[1].toInt()) + " " + m.groupValues[2] + "\n" }
+    s = LI_TAG.replace(s, "\n- ")
+    s = BLOCK_END.replace(s, "\n")
+    s = ANY_TAG.replace(s, "")
+    s = decodeEntities(s)
+    return MANY_NL.replace(s, "\n\n").trim()
+}
+
+private fun decodeEntities(s: String): String = s
+    .replace("&nbsp;", " ").replace("&amp;", "&").replace("&lt;", "<")
+    .replace("&gt;", ">").replace("&quot;", "\"").replace("&#39;", "'").replace("&apos;", "'")

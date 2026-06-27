@@ -75,6 +75,7 @@ cli/build/install/stele/bin/stele ingest code .                 # token mentions
 cli/build/install/stele/bin/stele ingest codegraph <export.json> # external resolved graph (GitNexus JSON)
 cli/build/install/stele/bin/stele ingest astindex <index.db>    # durable: read ast-index SQLite directly (automated)
 cli/build/install/stele/bin/stele ingest docs .                 # product layer: Markdown docs → concepts (describes)
+cli/build/install/stele/bin/stele ingest web <url> [<url>…]     # external pages (Jira/Confluence/any URL) → concepts
 cli/build/install/stele/bin/stele build-ontology --model <ollama-model>   # Phase 3: LOCAL LLM (Ollama, offline/free) canonicalizes concepts
 cli/build/install/stele/bin/stele build-ontology --provider anthropic     # opt-in cloud (needs ANTHROPIC_API_KEY)
 cli/build/install/stele/bin/stele dedupe-concepts               # merge same-named concepts (folder twins) → aliases

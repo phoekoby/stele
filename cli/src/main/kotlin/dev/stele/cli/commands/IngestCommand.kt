@@ -2,15 +2,19 @@ package dev.stele.cli.commands
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.arguments.argument
+import com.github.ajalt.clikt.parameters.arguments.multiple
+import com.github.ajalt.clikt.parameters.options.option
 import dev.stele.cli.requireDb
 import dev.stele.connectors.codegraph.AstIndexSource
 import dev.stele.connectors.codegraph.JsonCodeGraphSource
 import dev.stele.connectors.codegraph.ingestCodeGraph
 import dev.stele.connectors.docs.ingestDocs
+import dev.stele.connectors.docs.ingestWeb
 import dev.stele.core.db.openDb
 import dev.stele.core.store.GraphStore
 import dev.stele.extractors.ingestCode
 import dev.stele.extractors.ingestSymbols
+import java.io.File
 
 /** `stele ingest` — parent group; the work lives in its subcommands. */
 class IngestCommand : CliktCommand(name = "ingest", help = "Pull data from sources into the graph") {
@@ -106,4 +110,35 @@ class IngestAstIndexCommand : CliktCommand(
                 "${res.links} links across ${res.files} files",
         )
     }
+}
+
+class IngestWebCommand : CliktCommand(
+    name = "web",
+    help = "Ingest external pages (URLs) as product docs — links them to concepts like local Markdown",
+) {
+    private val urls by argument(name = "urls", help = "Page URLs to fetch and ingest").multiple()
+    private val from by option("--from", help = "Also read URLs from a file (one per line; # comments ok)")
+
+    override fun run() {
+        val all = (urls + readFrom(from)).map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+        if (all.isEmpty()) {
+            echo("Provide one or more URLs, or --from <file>.")
+            return
+        }
+        val conn = openDb(requireDb().path)
+        val res = ingestWeb(GraphStore(conn), all)
+        conn.close()
+        echo(
+            "✓ web: ${res.docs} pages, ${res.sections} sections, ${res.links} describes, " +
+                "${res.aliasesAdded} aliases, ${res.relations} concept↔concept, ${res.rules} rules",
+        )
+    }
+
+    private fun readFrom(path: String?): List<String> =
+        if (path == null) {
+            emptyList()
+        } else {
+            runCatching { File(path).readLines().filterNot { it.isBlank() || it.trimStart().startsWith("#") } }
+                .getOrDefault(emptyList())
+        }
 }
