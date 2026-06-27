@@ -1,0 +1,17 @@
+{
+  "version": "0.1.0",
+  "description": "Product<->code Rosetta stone — concept graph for AI coding agents",
+  "homepage": "https://github.com/USER/stele",
+  "license": "MIT",
+  "depends": "java/temurin-lts-jdk",
+  "url": "https://github.com/USER/stele/releases/download/v0.1.0/stele.jar",
+  "hash": "REPLACE_WITH_SHA256_OF_stele.jar",
+  "post_install": [
+    "Set-Content -Path \"$dir\\stele.cmd\" -Value '@java -jar \"%~dp0stele.jar\" %*' -Encoding ascii"
+  ],
+  "bin": "stele.cmd",
+  "checkver": "github",
+  "autoupdate": {
+    "url": "https://github.com/USER/stele/releases/download/v$version/stele.jar"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "run": "3 — multi-repo 3-arm (workflow wf_2e43add5-cf0)",
+  "repos": ["documenso@c219305", "sb0rka"],
+  "model": "sonnet, 1 sample/cell",
+  "scoring": "deterministic regex (LLM-authored per task)",
+  "agents": 180, "subagent_tokens": 4455896, "duration_ms": 216757,
+  "n_seeds": 45, "n_scorable": 41,
+  "byArm": { "plain": "10/41 = 24%", "astindex": "10/41 = 24%", "stele": "16/41 = 39%" },
+  "perRepo": {
+    "documenso": { "plain": "7/24=29%", "astindex": "5/24=21%", "stele": "8/24=33%" },
+    "sb0rka":    { "plain": "3/17=18%", "astindex": "5/17=29%", "stele": "8/17=47%" }
+  },
+  "mcnemar": {
+    "plain_vs_stele":    { "b": 7, "c": 1, "p": 0.070, "significant": false },
+    "astindex_vs_stele": { "b": 6, "c": 0, "p": 0.031, "significant": true }
+  },
+  "finding": "ast-index == plain (code structure gives no lift on rule-compliance); Stele +15pp, significant vs ast-index (p=0.031), borderline vs plain (p=0.070). Effect smaller than the hand-curated pilots (+60pp) due to auto-generated checker noise + larger rule variety; the delta holds in both repos."
+}

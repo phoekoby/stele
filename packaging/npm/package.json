@@ -1,0 +1,10 @@
+{
+  "name": "stele-cli",
+  "version": "0.1.0",
+  "description": "Product<->code Rosetta stone — concept graph for AI coding agents (npx launcher for the JVM CLI)",
+  "bin": { "stele": "bin/stele.js" },
+  "scripts": { "postinstall": "node scripts/download.js" },
+  "files": ["bin/", "scripts/"],
+  "license": "MIT",
+  "engines": { "node": ">=18" }
+}

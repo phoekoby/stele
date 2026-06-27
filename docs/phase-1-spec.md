@@ -1,18 +1,34 @@
 # Phase 1 — `stele ingest code` (детальный спек)
 
-*Цель фазы: научить Stele вытаскивать «сырой» язык продукта из кода — идентификаторы, строки, комментарии — на любом языке, через tree-sitter (WASM, без нативной сборки). Концепты/эмбеддинги/Figma — это Фазы 2–4, здесь их нет.*
+*Цель фазы: научить Stele вытаскивать «сырой» язык продукта из кода — идентификаторы, строки, комментарии — на любом языке, через tree-sitter. Концепты/эмбеддинги/Figma — это Фазы 2–4, здесь их нет.*
+
+> **Стек: Kotlin/JVM (порт), монорепо.** Реализация — модуль `extractors/` (`extractors/src/main/kotlin/dev/stele/extractors/`), поверх `core/`. Парсер — **java-tree-sitter** (`io.github.bonede:tree-sitter` + `tree-sitter-<lang>`, нативы в jar). Ниже — Kotlin-маппинг; TS-листинги оставлены как псевдокод-референс алгоритма (язык-независимого).
+
+## Kotlin-маппинг (что где)
+
+| Файл | Роль |
+|---|---|
+| `extractors/Grammars.kt` | `EXT_TO_LANG` (ext→грамматика, code-only) + `GRAMMARS` (key→фабрика `TSLanguage`); ключ без фабрики (напр. `tsx`) → graceful skip |
+| `extractors/Normalize.kt` | `splitIdentifier` / `normalize` (camelCase + `_ - . / :`, lowercase, дроп ≤1 и чисто-числовых) |
+| `extractors/FileWalker.kt` + `Stopwords.kt` | обход с IGNORE-сетом (>1 MB skip) · стоп-слова |
+| `extractors/CodeExtractor.kt` | `ingestCode(store, root): IngestResult(files, mentions, skippedLangs)` |
+| `core/store/GraphStore.kt` | `addArtifact` (upsert по `(source,ref)`), `addMention`, `clearMentions`, `topTerms` |
+| `core/db/Migrations.kt` + `resources/db/changelog/` | `migrate(conn)` через **Liquibase** (master XML → `changes/NNN-*.sql`); `schema: v<changeset>` из `DATABASECHANGELOG` |
+
+Грамматики (15): kotlin, java, python, go, rust, c, cpp, c_sharp, ruby, javascript, typescript, php, swift, scala, lua. Текст узла берётся срезом UTF-8-байтов исходника по `node.startByte..endByte` (у `TSNode` нет `getText()`).
 
 ---
 
 ## Definition of Done
 
 ```bash
-pnpm stele ingest code <path-to-repo>
-pnpm stele stats     # artifacts и mentions > 0
-pnpm stele terms     # топ нормализованных терминов домена
+./gradlew :cli:installDist
+cli/build/install/stele/bin/stele ingest code <path-to-repo>
+cli/build/install/stele/bin/stele stats     # artifacts и mentions > 0
+cli/build/install/stele/bin/stele terms      # топ нормализованных терминов домена
 ```
 
-Самопроверка: `pnpm stele ingest code .` на самом репозитории Stele должно вытащить его же идентификаторы.
+Самопроверка: `stele ingest code .` на самом репозитории Stele вытаскивает его же идентификаторы (термины вроде `graph store`, `ingest`, `schema`).
 
 ---
 
@@ -261,15 +277,18 @@ program
 
 ## Реализовано (статус)
 
-Готово в репозитории. Версии зафиксированы: **`web-tree-sitter@0.20.8` + `tree-sitter-wasms@0.1.13`** (один ABI).
-Покрытие: Kotlin, TypeScript/TSX, JavaScript, Python, Java, Go, Rust, C/C++, C#, Ruby, PHP, Scala, Swift, Lua, CSS/HTML/JSON/YAML и др.
-**Dart временно отключён** — его грамматика в этом паке новее по ABI и роняет загрузчик; вернём при переходе на современный web-tree-sitter (`@repomix/tree-sitter-wasms`) позже.
+**Kotlin-порт готов.** Парсер — java-tree-sitter (`io.github.bonede`), нативы (Win/Linux/macOS) лежат в jar — без C-сборки.
+Покрытие (15 грамматик): Kotlin, TypeScript, JavaScript, Python, Java, Go, Rust, C/C++, C#, Ruby, PHP, Scala, Swift, Lua.
+**TSX отключён** — у bonede нет TSX-биндинга → `tsx` в graceful-skip (как и любая грамматика, что не загрузилась).
 
 Запуск:
 ```
-pnpm install            # подтянет web-tree-sitter + tree-sitter-wasms
-pnpm stele ingest code .
-pnpm stele terms
+./gradlew build            # компиляция всех модулей + тесты (Normalize, CodeExtractor)
+./gradlew :cli:installDist
+cli/build/install/stele/bin/stele ingest code .
+cli/build/install/stele/bin/stele terms
 ```
 
-Проверено на смешанном TS+Kotlin+Python: термин «validate refund» всплыл во всех трёх языках — ubiquitous-language join-key в действии.
+Тесты (`:extractors`): `normalize("validateRefund") == "validate refund"`; `ingestCode` на temp-папке с `.kt`+`.py` даёт `mentions>0` и поднимает термин `refund`. Самопроверка на этом репо поднимает доменные термины (`graph store`, `clikt command`, `ingest`, …).
+
+*Историческая TS-версия (`web-tree-sitter` + `tree-sitter-wasms`) удалена; алгоритм перенесён 1-в-1.*

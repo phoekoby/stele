@@ -1,6 +1,19 @@
+# Gradle / Kotlin
+.gradle/
+.kotlin/
+build/
+local.properties
+
+# Stele local graph data
+.stele/
+
+# Legacy TS workspace (archived under legacy-ts/)
 node_modules/
 dist/
 *.tsbuildinfo
-.stele/
+
+# Env / OS / IDE
 .env
 .DS_Store
+.idea/
+*.iml
