@@ -268,27 +268,48 @@ class GraphStore(private val conn: Connection) {
             }
         }
 
-        val groups = all.groupBy { it.name }.filterValues { it.size > 1 }
+        // Group by a normalized key so case + singular/plural twins collapse (Secret/Secrets, Tag/Tags).
+        val groups = all.groupBy { normKey(it.name) }.filterValues { it.size > 1 }
         var merged = 0
         for ((_, group) in groups) {
-            val sorted = group.sortedWith(compareByDescending<ConceptRow> { it.hasDef }.thenByDescending { it.edges })
+            val sorted = group.sortedWith(
+                compareByDescending<ConceptRow> { it.hasDef }.thenByDescending { it.edges }.thenBy { it.name.length },
+            )
             val keep = sorted.first()
             val aliases = LinkedHashSet(parseStringArray(keep.aliasesJson))
             for (drop in sorted.drop(1)) {
-                conn.prepareStatement(
-                    "UPDATE OR IGNORE edges SET dst_id = ? WHERE dst_id = ? AND type = 'implements'",
-                ).use { it.setString(1, keep.id); it.setString(2, drop.id); it.executeUpdate() }
+                // Repoint ALL edges (not only implements) so the survivor inherits the twin's docs/rules/relations.
+                for (col in listOf("dst_id", "src_id")) {
+                    conn.prepareStatement("UPDATE OR IGNORE edges SET $col = ? WHERE $col = ?").use {
+                        it.setString(1, keep.id); it.setString(2, drop.id); it.executeUpdate()
+                    }
+                }
                 aliases += parseStringArray(drop.aliasesJson)
                 aliases += drop.name
-                deleteConcept(drop.id)
+                deleteConcept(drop.id) // drops edges that collided (OR IGNORE skipped) + the concept row
                 merged++
             }
             aliases.remove(keep.name)
             conn.prepareStatement("UPDATE concepts SET aliases_json = ? WHERE id = ?").use {
-                it.setString(1, jsonEncode(aliases.toList())); it.setString(2, keep.id)
+                it.setString(1, jsonEncode(aliases.toList())); it.setString(2, keep.id); it.executeUpdate()
             }
         }
+        // Remove self-loops a merge may have created (e.g. survivor —relates→ its twin).
+        conn.prepareStatement("DELETE FROM edges WHERE src_id = dst_id").use { it.executeUpdate() }
         return DedupeResult(merged, groups.size)
+    }
+
+    /** Normalize a concept name for dedup: lowercase + naive English singularization (keeps trailing `ss`). */
+    private fun normKey(name: String): String {
+        val n = name.trim().lowercase()
+        return when {
+            n.length <= 3 || n.endsWith("ss") -> n
+            n.endsWith("ies") -> n.dropLast(3) + "y"
+            n.endsWith("ses") || n.endsWith("xes") || n.endsWith("zes") ||
+                n.endsWith("ches") || n.endsWith("shes") -> n.dropLast(2)
+            n.endsWith("s") -> n.dropLast(1)
+            else -> n
+        }
     }
 
     /** Drop a concept the canonicalizer rejected, along with edges touching it. */
