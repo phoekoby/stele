@@ -78,6 +78,7 @@ cli/build/install/stele/bin/stele ingest docs .                 # product layer:
 cli/build/install/stele/bin/stele ingest web <url> [<url>…]     # external pages (Jira/Confluence/any URL) → concepts
 cli/build/install/stele/bin/stele build-ontology --model <ollama-model>   # Phase 3: LOCAL LLM (Ollama, offline/free) canonicalizes concepts
 cli/build/install/stele/bin/stele build-ontology --provider anthropic     # opt-in cloud (needs ANTHROPIC_API_KEY)
+cli/build/install/stele/bin/stele refine-rules --model <ollama-model>     # curate scraped product rules → invariants (keep/rewrite/drop noise)
 cli/build/install/stele/bin/stele dedupe-concepts               # merge same-named concepts (folder twins) → aliases
 cli/build/install/stele/bin/stele review --type relates         # Phase 5: human confirm/reject (or --accept-above 0.6 bulk)
 cli/build/install/stele/bin/stele concept <Name>                # code behind a concept (cross-language)

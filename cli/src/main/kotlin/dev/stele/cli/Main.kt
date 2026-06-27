@@ -14,6 +14,7 @@ import dev.stele.cli.commands.IngestDocsCommand
 import dev.stele.cli.commands.IngestSymbolsCommand
 import dev.stele.cli.commands.IngestWebCommand
 import dev.stele.cli.commands.McpCommand
+import dev.stele.cli.commands.RefineRulesCommand
 import dev.stele.cli.commands.ReviewCommand
 import dev.stele.cli.commands.InitCommand
 import dev.stele.cli.commands.StatsCommand
@@ -38,6 +39,7 @@ fun main(args: Array<String>) =
                 IngestCodeGraphCommand(), IngestAstIndexCommand(),
             ),
             BuildOntologyCommand(),
+            RefineRulesCommand(),
             DedupeCommand(),
             ReviewCommand(),
             TermsCommand(),

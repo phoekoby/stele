@@ -64,6 +64,15 @@ data class CodeContextEntry(
 /** A resolved `calls` edge between two code symbols (refs are `file#symbol`). */
 data class CallEdge(val fromRef: String, val toRef: String)
 
+/** A scraped product-rule candidate (one `constrains` edge) awaiting LLM refinement. */
+data class RuleCandidate(
+    val edgeId: String,
+    val ruleId: String,
+    val text: String,
+    val conceptId: String,
+    val concept: String,
+)
+
 /** A proposed edge surfaced for human review (Phase 5), with resolved endpoint labels. */
 data class EdgeView(
     val id: String,

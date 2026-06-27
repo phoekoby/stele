@@ -4,6 +4,7 @@ import dev.stele.core.model.Artifact
 import dev.stele.core.model.ArtifactKind
 import dev.stele.core.model.CallEdge
 import dev.stele.core.model.CodeContextEntry
+import dev.stele.core.model.RuleCandidate
 import dev.stele.core.model.Concept
 import dev.stele.core.model.ConceptCandidate
 import dev.stele.core.model.ConceptStatus
@@ -368,6 +369,40 @@ class GraphStore(private val conn: Connection) {
     fun setEdgeStatus(id: String, status: EdgeStatus): Boolean =
         conn.prepareStatement("UPDATE edges SET status = ? WHERE id = ?").use {
             it.setString(1, status.value); it.setString(2, id); it.executeUpdate() > 0
+        }
+
+    /** Replace a rule artifact's title with the refined invariant text. */
+    fun updateArtifactTitle(id: String, title: String) {
+        conn.prepareStatement("UPDATE artifacts SET title = ? WHERE id = ?").use {
+            it.setString(1, title); it.setString(2, id); it.executeUpdate()
+        }
+    }
+
+    /** Scraped product-rule candidates: each proposed `constrains` edge with its rule text + concept. */
+    fun candidateRules(limit: Int = 1000): List<RuleCandidate> =
+        conn.prepareStatement(
+            """
+            SELECT e.id AS eid, a.id AS aid, COALESCE(a.body, a.title) AS txt, cc.id AS cid, cc.name AS cname
+            FROM edges e
+            JOIN artifacts a ON a.id = e.src_id AND a.kind = 'rule'
+            JOIN concepts cc ON cc.id = e.dst_id
+            WHERE e.type = 'constrains' AND e.status = 'proposed'
+            ORDER BY cc.name, a.ref LIMIT ?
+            """.trimIndent(),
+        ).use { st ->
+            st.setInt(1, limit)
+            st.executeQuery().use { rs ->
+                buildList {
+                    while (rs.next()) {
+                        add(
+                            RuleCandidate(
+                                rs.getString("eid"), rs.getString("aid"),
+                                rs.getString("txt") ?: "", rs.getString("cid"), rs.getString("cname"),
+                            ),
+                        )
+                    }
+                }
+            }
         }
 
     /** Bulk-confirm proposed edges (optionally one type) with confidence >= [minConfidence]. */
