@@ -60,7 +60,8 @@ stele=$PWD/cli/build/install/stele/bin/stele     # (Windows: ...\stele.bat)
 
 cd /path/to/your/repo
 $stele init                            # creates ./.stele/graph.db
-$stele ingest symbols .                # code → candidate concepts (tree-sitter, 15 languages)
+$stele install-hook                    # (optional) git hooks → keep the index fresh on every commit
+$stele ingest symbols .                # code → candidate concepts (tree-sitter, 15 langs; re-runs are incremental)
 $stele build-ontology --model llama3.1 # LLM names/defines concepts (LOCAL Ollama; or --provider anthropic)
 $stele dedupe-concepts                 # merge folder-twins
 $stele ingest docs .                   # product docs → rules, relations, product language
@@ -129,6 +130,7 @@ A working prototype, not production. What's real today:
 - ✅ **End-to-end works, fully local** — ingest → ontology → docs/rules → human review → MCP, offline (LLM via local Ollama).
 - ✅ **Code layer is high-precision** — symbols→concepts (folder clustering on organized repos) and resolved `calls` from a real indexer.
 - ✅ **One unified graph** — code, docs, and rules all hang off shared concepts; cross-language by construction.
+- ✅ **Stays fresh, re-indexes incrementally** — each file's mtime is tracked, so `ingest symbols` re-parses only what changed (a no-op re-run touches nothing); `stele install-hook` keeps it current on every commit, and `context_for_code` warns the agent when the file it's editing changed since indexing.
 - ⚠️ **Product layer is deterministic-first and noisy** — doc→concept / rule / relation matching is broad keyword & co-occurrence, so it produces many low-confidence *proposals*. The fixes — a stricter **serving gate** and the human **`review`** loop — exist but aren't fully tightened. Treat unconfirmed edges as suggestions.
 - 🔜 **Not built yet** — Figma / design layer, git+PR evidence (*why this code exists*), vector recall (`sqlite-vec`), a tightened quality gate, broader tests.
 

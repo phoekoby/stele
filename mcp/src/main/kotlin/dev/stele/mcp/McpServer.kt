@@ -21,7 +21,11 @@ import java.io.Writer
  * 2.0) — the serving layer. Hand-rolled to keep the tool zero-infra/local; it
  * exposes the concept spine to agents via `concept_context` and `why_code`.
  */
-class McpServer(private val store: GraphStore, private val usage: UsageLog? = null) {
+class McpServer(
+    private val store: GraphStore,
+    private val usage: UsageLog? = null,
+    private val repoRoot: java.io.File? = null,
+) {
     private val json = Json { }
 
     fun serve(input: BufferedReader, output: Writer) {
@@ -124,7 +128,8 @@ class McpServer(private val store: GraphStore, private val usage: UsageLog? = nu
                     "Provide a path."
                 } else {
                     val (callsOut, callsIn) = store.callsForPath(path)
-                    formatCodeContext(path, store.codeContext(path), callsOut, callsIn)
+                    val stale = if (repoRoot != null && store.isStale(path, repoRoot)) setOf(path) else emptySet()
+                    formatCodeContext(path, store.codeContext(path), callsOut, callsIn, stale)
                 }
             }
             else -> "Unknown tool: $name"

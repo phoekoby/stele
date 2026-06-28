@@ -10,6 +10,7 @@ import dev.stele.connectors.codegraph.JsonCodeGraphSource
 import dev.stele.connectors.codegraph.ingestCodeGraph
 import dev.stele.connectors.docs.ingestDocs
 import dev.stele.connectors.docs.ingestWeb
+import dev.stele.core.db.migrate
 import dev.stele.core.db.openDb
 import dev.stele.core.store.GraphStore
 import dev.stele.extractors.ingestCode
@@ -47,11 +48,12 @@ class IngestSymbolsCommand : CliktCommand(
 
     override fun run() {
         val conn = openDb(requireDb().path)
+        migrate(conn) // ensure source_files exists on graphs created before incremental re-index
         val res = ingestSymbols(GraphStore(conn), path)
         conn.close()
         echo(
-            "✓ symbols: ${res.symbols} symbols, ${res.concepts} concepts, " +
-                "${res.links} links across ${res.files} files",
+            "✓ symbols: ${res.changed}/${res.files} files re-parsed → ${res.symbols} symbols, " +
+                "${res.concepts} concepts, ${res.links} links (unchanged files skipped)",
         )
         if (res.skippedLangs.isNotEmpty()) {
             echo("  skipped grammars: ${res.skippedLangs.joinToString(", ")}")

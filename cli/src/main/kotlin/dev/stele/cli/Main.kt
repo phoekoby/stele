@@ -13,6 +13,7 @@ import dev.stele.cli.commands.IngestCommand
 import dev.stele.cli.commands.IngestDocsCommand
 import dev.stele.cli.commands.IngestSymbolsCommand
 import dev.stele.cli.commands.IngestWebCommand
+import dev.stele.cli.commands.InstallHookCommand
 import dev.stele.cli.commands.McpCommand
 import dev.stele.cli.commands.RefineRulesCommand
 import dev.stele.cli.commands.ReviewCommand
@@ -47,5 +48,6 @@ fun main(args: Array<String>) =
             ExplainCommand(),
             McpCommand(),
             UsageCommand(),
+            InstallHookCommand(),
         )
         .main(args)

@@ -13,7 +13,8 @@ import org.treesitter.TSParser
 import java.io.File
 
 data class SymbolIngestResult(
-    val files: Int,
+    val files: Int,      // total source files tracked
+    val changed: Int,    // re-parsed this run (new or modified); the rest were unchanged
     val symbols: Int,
     val concepts: Int,
     val links: Int,
@@ -62,19 +63,29 @@ fun ingestSymbols(store: GraphStore, rootArg: String): SymbolIngestResult {
     val skipped = LinkedHashSet<String>()
     val concepts = HashMap<String, String>()
     val symbolRefs = HashSet<String>()
-    val files = HashSet<String>()
+    val seen = HashSet<String>()
+    var changed = 0
     var links = 0
+
+    // Incremental: re-parse only files whose mtime changed since last index; keep the rest as-is.
+    val prevMtimes = store.fileMtimes()
 
     for (file in walk(root)) {
         val langKey = EXT_TO_LANG["." + file.extension] ?: continue
         val language = langCache.getOrPut(langKey) { loadLanguage(langKey, parser, skipped) } ?: continue
-        parser.setLanguage(language)
-
-        val src = file.readText()
-        val bytes = src.toByteArray(Charsets.UTF_8)
-        val tree = parser.parseString(null, src) ?: continue
-
         val ref = rootPath.relativize(file.toPath()).toString().replace('\\', '/')
+        seen.add(ref)
+        val mtime = file.lastModified()
+        if (prevMtimes[ref] == mtime) continue // unchanged — keep its existing symbols
+
+        if (ref in prevMtimes) store.deleteFileArtifacts(ref) // changed: drop the old symbols first
+        changed++
+        store.recordFile(ref, mtime)
+
+        parser.setLanguage(language)
+        val src = file.readText()
+        val tree = parser.parseString(null, src) ?: continue
+        val bytes = src.toByteArray(Charsets.UTF_8)
         val cluster = clusterLabel(ref)
         var fileHadSymbols = false
 
@@ -86,7 +97,6 @@ fun ingestSymbols(store: GraphStore, rootArg: String): SymbolIngestResult {
             if (name != null && name.length in 2..80) {
                 if (!fileHadSymbols) {
                     store.addArtifact(ArtifactKind.FILE, Layer.CODE, "code", ref, title = ref)
-                    files.add(ref)
                     fileHadSymbols = true
                 }
                 val symbolRef = "$ref#$name"
@@ -118,7 +128,13 @@ fun ingestSymbols(store: GraphStore, rootArg: String): SymbolIngestResult {
         }
     }
 
-    return SymbolIngestResult(files.size, symbolRefs.size, concepts.size, links, skipped.toList())
+    // Files indexed before but gone now → drop their now-stale symbols.
+    for (gone in prevMtimes.keys - seen) {
+        store.deleteFileArtifacts(gone)
+        store.deleteSourceFile(gone)
+    }
+
+    return SymbolIngestResult(seen.size, changed, symbolRefs.size, concepts.size, links, skipped.toList())
 }
 
 /** The declared name of a definition node, or null if the node isn't a named declaration. */

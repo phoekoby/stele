@@ -10,5 +10,6 @@
          then add an include line below. -->
     <include file="db/changelog/changes/001-initial-schema.sql" relativeToChangelogFile="false"/>
     <include file="db/changelog/changes/002-indexes.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/003-source-files.sql" relativeToChangelogFile="false"/>
 
 </databaseChangeLog>

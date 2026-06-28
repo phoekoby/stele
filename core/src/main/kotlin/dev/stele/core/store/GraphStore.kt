@@ -399,6 +399,54 @@ class GraphStore(private val conn: Connection) {
         }
     }
 
+    // --- incremental re-index + staleness: per-file mtime provenance ---
+
+    fun fileMtimes(): Map<String, Long> = buildMap {
+        conn.prepareStatement("SELECT path, mtime FROM source_files").use { st ->
+            st.executeQuery().use { rs -> while (rs.next()) put(rs.getString("path"), rs.getLong("mtime")) }
+        }
+    }
+
+    fun recordFile(path: String, mtime: Long) {
+        conn.prepareStatement(
+            "INSERT INTO source_files(path, mtime) VALUES(?, ?) ON CONFLICT(path) DO UPDATE SET mtime = excluded.mtime",
+        ).use { it.setString(1, path); it.setLong(2, mtime); it.executeUpdate() }
+    }
+
+    fun deleteSourceFile(path: String) {
+        conn.prepareStatement("DELETE FROM source_files WHERE path = ?").use { it.setString(1, path); it.executeUpdate() }
+    }
+
+    /** Drop a file's extracted code artifacts (its FILE node + `code_symbol`s) and every edge touching them. */
+    fun deleteFileArtifacts(path: String) {
+        val ids = "SELECT id FROM artifacts WHERE source = 'code' AND (ref = ? OR ref LIKE ?)"
+        conn.prepareStatement("DELETE FROM edges WHERE src_id IN ($ids) OR dst_id IN ($ids)").use {
+            it.setString(1, path); it.setString(2, "$path#%"); it.setString(3, path); it.setString(4, "$path#%")
+            it.executeUpdate()
+        }
+        conn.prepareStatement("DELETE FROM artifacts WHERE source = 'code' AND (ref = ? OR ref LIKE ?)").use {
+            it.setString(1, path); it.setString(2, "$path#%"); it.executeUpdate()
+        }
+    }
+
+    /** Has this one indexed file changed on disk since it was indexed? (Cheap single-path check for serving.) */
+    fun isStale(path: String, repoRoot: java.io.File): Boolean {
+        val stored = conn.prepareStatement("SELECT mtime FROM source_files WHERE path = ?").use { st ->
+            st.setString(1, path)
+            st.executeQuery().use { rs -> if (rs.next()) rs.getLong(1) else return false }
+        }
+        val f = java.io.File(repoRoot, path)
+        return !f.exists() || f.lastModified() != stored
+    }
+
+    /** Indexed files whose on-disk mtime no longer matches the index — changed (or removed) since indexing. */
+    fun staleFiles(repoRoot: java.io.File): Set<String> = buildSet {
+        for ((path, mtime) in fileMtimes()) {
+            val f = java.io.File(repoRoot, path)
+            if (!f.exists() || f.lastModified() != mtime) add(path)
+        }
+    }
+
     /** Scraped product-rule candidates: each proposed `constrains` edge with its rule text + concept. */
     fun candidateRules(limit: Int = 1000): List<RuleCandidate> =
         conn.prepareStatement(

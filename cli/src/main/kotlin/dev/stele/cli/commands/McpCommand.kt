@@ -28,7 +28,9 @@ class McpCommand : CliktCommand(
         val conn = openDb(dbFileResolved.path)
         if (fresh) migrate(conn)
         val usage = UsageLog(File(dbFileResolved.parentFile, "usage.jsonl"))
-        McpServer(GraphStore(conn), usage).serve(
+        // repo root = the dir that holds .stele, so the server can stat files for staleness.
+        val repoRoot = dbFileResolved.parentFile?.parentFile
+        McpServer(GraphStore(conn), usage, repoRoot).serve(
             System.`in`.bufferedReader(Charsets.UTF_8),
             OutputStreamWriter(System.out, Charsets.UTF_8),
         )

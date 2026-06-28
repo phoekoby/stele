@@ -15,11 +15,14 @@ class ExplainCommand : CliktCommand(
 
     override fun run() {
         val p = path.replace('\\', '/')
-        val conn = openDb(requireDb().path)
+        val db = requireDb()
+        val conn = openDb(db.path)
         val store = GraphStore(conn)
         val entries = store.codeContext(p)
         val (callsOut, callsIn) = store.callsForPath(p)
+        val repoRoot = db.parentFile?.parentFile
+        val stale = if (repoRoot != null && store.isStale(p, repoRoot)) setOf(p) else emptySet()
         conn.close()
-        echo(formatCodeContext(p, entries, callsOut, callsIn))
+        echo(formatCodeContext(p, entries, callsOut, callsIn, stale))
     }
 }

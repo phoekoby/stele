@@ -11,11 +11,15 @@ fun formatCodeContext(
     entries: List<CodeContextEntry>,
     callsOut: List<CallEdge> = emptyList(),
     callsIn: List<CallEdge> = emptyList(),
+    stale: Set<String> = emptySet(),
 ): String {
     if (entries.isEmpty() && callsOut.isEmpty() && callsIn.isEmpty()) {
         return "$path — no concept linked yet. Run `stele ingest symbols` + `build-ontology` + `ingest docs`."
     }
     return buildString {
+        if (path in stale) {
+            append("⚠ $path changed since it was indexed — symbols below may be stale; re-run `stele ingest symbols`.\n\n")
+        }
         append("$path implements ${entries.size} concept(s):\n")
         for (e in entries) {
             append("\n▸ ${e.concept.name}")
