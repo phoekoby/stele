@@ -28,6 +28,8 @@ class BuildOntologyCommand : CliktCommand(
             model ?: cfg?.model,
             ollamaUrl ?: cfg?.ollamaUrl ?: "http://localhost:11434",
             responses,
+            cfg?.baseUrl,
+            cfg?.apiKeyEnv,
         )
 
         val conn = openDb(requireDb().path)

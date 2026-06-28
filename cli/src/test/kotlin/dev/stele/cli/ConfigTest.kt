@@ -28,6 +28,17 @@ class ConfigTest {
     }
 
     @Test
+    fun `parses an OpenAI-compatible provider (deepseek)`() {
+        val cfg = ConfigLoader.parse(
+            "llm: { provider: deepseek, model: deepseek-chat, baseUrl: https://api.deepseek.com, apiKeyEnv: DEEPSEEK_API_KEY }",
+        )
+        assertEquals("deepseek", cfg.llm.provider)
+        assertEquals("deepseek-chat", cfg.llm.model)
+        assertEquals("https://api.deepseek.com", cfg.llm.baseUrl)
+        assertEquals("DEEPSEEK_API_KEY", cfg.llm.apiKeyEnv)
+    }
+
+    @Test
     fun `unknown keys are tolerated`() {
         val cfg = ConfigLoader.parse("future: { whatever: 1 }\nllm: { provider: ollama }")
         assertEquals("ollama", cfg.llm.provider)

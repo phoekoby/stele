@@ -81,7 +81,14 @@ sources:
 review:  { acceptAbove: 0.8 }
 ```
 
-Adding a new connector (Notion, Slack, an API…) is a small class implementing `Connector` plus one line in the registry. Prefer the manual steps? Each pipeline stage is still its own command (`ingest symbols`, `build-ontology`, `dedupe-concepts`, `ingest docs`, `review`). Everything is **local and offline** — the LLM defaults to a local [Ollama](https://ollama.com) model; cloud (Anthropic) is opt-in (`--provider anthropic`, needs `ANTHROPIC_API_KEY`).
+Adding a new connector (Notion, Slack, an API…) is a small class implementing `Connector` plus one line in the registry. Prefer the manual steps? Each pipeline stage is still its own command (`ingest symbols`, `build-ontology`, `dedupe-concepts`, `ingest docs`, `review`), and `stele search <term>` finds concepts by name/alias/definition from the terminal.
+
+The LLM step is **local and offline by default** (a local [Ollama](https://ollama.com) model). Cloud is opt-in and provider-pluggable — **Anthropic**, **DeepSeek**, **OpenAI**, or any OpenAI-compatible endpoint:
+
+```yaml
+llm: { provider: deepseek, model: deepseek-chat }   # set DEEPSEEK_API_KEY in your env
+# any other compatible API: provider + model + baseUrl + apiKeyEnv
+```
 
 ---
 

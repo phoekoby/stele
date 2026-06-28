@@ -593,6 +593,19 @@ class GraphStore(private val conn: Connection) {
         return GraphExport(nodes, links)
     }
 
+    /** Fuzzy concept lookup for `stele search`: substring match on name, definition or aliases; resolved first. */
+    fun searchConcepts(query: String, limit: Int = 20): List<Concept> {
+        val q = "%${query.lowercase()}%"
+        return conn.prepareStatement(
+            "SELECT id, name, definition, bounded_context, aliases_json, status FROM concepts " +
+                "WHERE lower(name) LIKE ? OR lower(COALESCE(definition, '')) LIKE ? OR lower(COALESCE(aliases_json, '')) LIKE ? " +
+                "ORDER BY (COALESCE(TRIM(definition), '') <> '') DESC, length(name), name LIMIT ?",
+        ).use { st ->
+            st.setString(1, q); st.setString(2, q); st.setString(3, q); st.setInt(4, limit)
+            st.executeQuery().use { rs -> buildList { while (rs.next()) add(rowToConcept(rs)) } }
+        }
+    }
+
     /** All concepts with their aliases — the ubiquitous-language vocabulary for doc matching. */
     fun conceptVocabulary(): List<Concept> =
         conn.prepareStatement(

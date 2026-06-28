@@ -22,10 +22,14 @@ object ConfigLoader {
         # Stele config - commit this; the graph in .stele/ is gitignored.
         # Configure once, then run the whole pipeline with:  stele sync
         llm:
-          provider: ollama            # ollama (local, default) | anthropic (needs ANTHROPIC_API_KEY)
-          model: llama3.1             # provider-specific model id
+          provider: ollama            # ollama (local) | anthropic | deepseek | openai | <any OpenAI-compatible>
+          model: llama3.1             # provider-specific model id (e.g. deepseek-chat, gpt-4o-mini)
           ollamaUrl: http://localhost:11434
           batch: 8
+          # Cloud example — DeepSeek (set DEEPSEEK_API_KEY in your env):
+          #   provider: deepseek
+          #   model: deepseek-chat
+          # Any other OpenAI-compatible API: set provider + model + baseUrl + apiKeyEnv.
 
         sources:
           - { type: symbols, path: "." }     # code -> candidate concepts (tree-sitter, incremental)

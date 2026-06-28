@@ -17,6 +17,9 @@ data class LlmConfig(
     val model: String? = null,
     val ollamaUrl: String = "http://localhost:11434",
     val batch: Int = 8,
+    // For OpenAI-compatible providers (deepseek/openai/any): the API root and which env var holds the key.
+    val baseUrl: String? = null,
+    val apiKeyEnv: String? = null,
 )
 
 @Serializable

@@ -50,7 +50,9 @@ class SyncCommand : CliktCommand(
         runSources(store, code, "code sources")
 
         if (!noLlm) {
-            val llm = LlmFactory.build(cfg.llm.provider, cfg.llm.model, cfg.llm.ollamaUrl, responses)
+            val llm = LlmFactory.build(
+                cfg.llm.provider, cfg.llm.model, cfg.llm.ollamaUrl, responses, cfg.llm.baseUrl, cfg.llm.apiKeyEnv,
+            )
             echo("ontology: canonicalizing via ${llm.name} …")
             val o = canonicalize(store, llm, batchSize = cfg.llm.batch)
             echo("  • ${o.kept} concepts kept (${o.renamed} renamed), ${o.dropped} dropped, ${o.skipped} unresolved")
