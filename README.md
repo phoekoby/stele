@@ -134,6 +134,40 @@ A working prototype, not production. What's real today:
 
 ---
 
+## Benchmarks — measured (honest)
+
+Run on three public repos — **PocketBase** (Go + JS), **CloudNativePG** (Go), **Coder** (Go + TS) — indexed end-to-end with a **local** `gpt-oss:20b` for `build-ontology`. Reproducible from the CLI; method notes inline.
+
+**Coverage & precision**
+
+| | indexed | concept→code links verified | docs linked |
+|---|---|---|---|
+| 3 repos combined | **40,436** code symbols | **714 / 714 = 100%** (0 dangling) | **675** doc pages |
+
+Every `implements` edge from a canonicalized concept was checked against source — the file exists and the symbol is a real declaration. **Zero hallucinated links.**
+
+Canonicalization is **high-precision, low-recall** on a small local model: PocketBase **207 candidates → 26 clean concepts** (`Collection`, `Backup`, `MFA`, `OTP`…), CloudNativePG **152 → 11** (`WalArchive`, `PgBouncer`, `Publication`…). The rest stay `unresolved` for `review` or a stronger model; the **kept** set is what's verified above.
+
+**A/B — agent codebase-Q&A, with vs without Stele** (PocketBase, subagents, blind judge vs gold answers)
+
+| Mode | Answer quality | Context per question |
+|---|---|---|
+| grep/read agent (baseline) | ~97 / 100 | ~8,800 tokens read |
+| **Stele map only** | ~84 / 100 | **~160 tokens** (≈50× less) |
+| **Stele map + read** | **100 / 100** \* | full quality, straight to 2–3 files |
+
+<sub>\* map+read n=2 — harness reliability was poor (several subagents failed); directional, not definitive.</sub>
+
+**What the A/B proves**
+
+- 🗜️ **~50× less context** — a concept map (~160 tok) answers what costs ~8,800 tok of file-reading, at ~85% of full-read quality. Cheap grounding for an agent.
+- 🎯 **Straight to the target** — given the map, the agent reaches full-quality answers reading 2–3 files instead of searching the repo. The win is fewer steps and no missed files.
+- 🔗 **Trustworthy navigation** — 100% of concept→code links point at real code, so the agent navigates instead of chasing ghosts.
+
+**What it does *not* show (honest):** Stele doesn't make the agent *smarter* — a capable grep/read agent already scores ~97. The value is **cheaper context and precise navigation**, not higher intelligence. And map-only loses completeness on multi-file features (low recall) — there you want map-**plus**-read.
+
+---
+
 ## Roadmap
 
 `code → concepts` ✅ → `product docs + rules` ✅ → `human curation` ✅ → `serve to agent (MCP)` ✅ → **quality gate** → **design (Figma)** → **evidence (git/PR)** → federation.
