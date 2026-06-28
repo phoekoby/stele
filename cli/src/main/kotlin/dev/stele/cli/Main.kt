@@ -6,6 +6,7 @@ import dev.stele.cli.commands.BuildOntologyCommand
 import dev.stele.cli.commands.ConceptCommand
 import dev.stele.cli.commands.DedupeCommand
 import dev.stele.cli.commands.ExplainCommand
+import dev.stele.cli.commands.GraphCommand
 import dev.stele.cli.commands.IngestAstIndexCommand
 import dev.stele.cli.commands.IngestCodeCommand
 import dev.stele.cli.commands.IngestCodeGraphCommand
@@ -48,6 +49,7 @@ fun main(args: Array<String>) =
             TermsCommand(),
             ConceptCommand(),
             ExplainCommand(),
+            GraphCommand(),
             McpCommand(),
             UsageCommand(),
             InstallHookCommand(),

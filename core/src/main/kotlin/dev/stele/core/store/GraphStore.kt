@@ -401,11 +401,14 @@ class GraphStore(private val conn: Connection) {
 
     // --- incremental re-index + staleness: per-file mtime provenance ---
 
-    fun fileMtimes(): Map<String, Long> = buildMap {
-        conn.prepareStatement("SELECT path, mtime FROM source_files").use { st ->
-            st.executeQuery().use { rs -> while (rs.next()) put(rs.getString("path"), rs.getLong("mtime")) }
+    // Defensive: graphs created before migration 003 have no source_files table; treat as "nothing tracked".
+    fun fileMtimes(): Map<String, Long> = runCatching {
+        buildMap {
+            conn.prepareStatement("SELECT path, mtime FROM source_files").use { st ->
+                st.executeQuery().use { rs -> while (rs.next()) put(rs.getString("path"), rs.getLong("mtime")) }
+            }
         }
-    }
+    }.getOrDefault(emptyMap())
 
     fun recordFile(path: String, mtime: Long) {
         conn.prepareStatement(
@@ -431,10 +434,12 @@ class GraphStore(private val conn: Connection) {
 
     /** Has this one indexed file changed on disk since it was indexed? (Cheap single-path check for serving.) */
     fun isStale(path: String, repoRoot: java.io.File): Boolean {
-        val stored = conn.prepareStatement("SELECT mtime FROM source_files WHERE path = ?").use { st ->
-            st.setString(1, path)
-            st.executeQuery().use { rs -> if (rs.next()) rs.getLong(1) else return false }
-        }
+        val stored = runCatching {
+            conn.prepareStatement("SELECT mtime FROM source_files WHERE path = ?").use { st ->
+                st.setString(1, path)
+                st.executeQuery().use { rs -> if (rs.next()) rs.getLong(1) else null }
+            }
+        }.getOrNull() ?: return false
         val f = java.io.File(repoRoot, path)
         return !f.exists() || f.lastModified() != stored
     }
@@ -520,6 +525,72 @@ class GraphStore(private val conn: Connection) {
             }
         }
         return added
+    }
+
+    /**
+     * Full graph snapshot for visualization: every concept (with its attached
+     * symbol/doc/rule samples) + concept↔concept `relates` edges. Deliberately
+     * **ungated** (shows `proposed` and unresolved too) so the picture reflects
+     * the real index quality, not just the curated serving slice.
+     */
+    fun exportGraph(): GraphExport {
+        val symbolCount = HashMap<String, Int>()
+        val files = HashMap<String, LinkedHashSet<String>>()
+        conn.prepareStatement(
+            "SELECT e.dst_id AS cid, a.ref AS ref FROM edges e JOIN artifacts a ON a.id = e.src_id " +
+                "WHERE e.type = 'implements' AND a.kind = 'code_symbol'",
+        ).use { st ->
+            st.executeQuery().use { rs ->
+                while (rs.next()) {
+                    val cid = rs.getString("cid")
+                    symbolCount[cid] = (symbolCount[cid] ?: 0) + 1
+                    files.getOrPut(cid) { LinkedHashSet() }.add(rs.getString("ref").substringBefore('#'))
+                }
+            }
+        }
+        val docs = HashMap<String, LinkedHashSet<String>>()
+        conn.prepareStatement(
+            "SELECT e.dst_id AS cid, COALESCE(a.title, a.ref) AS t FROM edges e JOIN artifacts a ON a.id = e.src_id " +
+                "WHERE e.type = 'describes' AND a.kind = 'doc'",
+        ).use { st ->
+            st.executeQuery().use { rs ->
+                while (rs.next()) docs.getOrPut(rs.getString("cid")) { LinkedHashSet() }.add(rs.getString("t"))
+            }
+        }
+        val rules = HashMap<String, MutableList<String>>()
+        conn.prepareStatement(
+            "SELECT e.dst_id AS cid, a.title AS t FROM edges e JOIN artifacts a ON a.id = e.src_id " +
+                "WHERE e.type = 'constrains' AND a.kind = 'rule' AND a.title IS NOT NULL",
+        ).use { st ->
+            st.executeQuery().use { rs ->
+                while (rs.next()) rules.getOrPut(rs.getString("cid")) { mutableListOf() }.add(rs.getString("t"))
+            }
+        }
+        val links = buildList {
+            conn.prepareStatement("SELECT src_id, dst_id, status, confidence FROM edges WHERE type = 'relates'").use { st ->
+                st.executeQuery().use { rs ->
+                    while (rs.next()) {
+                        add(GraphLink(rs.getString(1), rs.getString(2), rs.getString(3), rs.getDouble(4)))
+                    }
+                }
+            }
+        }
+        val nodes = conceptVocabulary().map { c ->
+            GraphNode(
+                id = c.id,
+                name = c.name,
+                definition = c.definition?.takeIf { it.isNotBlank() },
+                boundedContext = c.boundedContext?.takeIf { it.isNotBlank() },
+                aliases = c.aliases,
+                status = c.status.value,
+                resolved = !c.definition.isNullOrBlank(),
+                symbols = symbolCount[c.id] ?: 0,
+                files = (files[c.id]?.sorted() ?: emptyList()).take(60),
+                docs = (docs[c.id]?.toList() ?: emptyList()).take(40),
+                rules = rules[c.id] ?: emptyList(),
+            )
+        }
+        return GraphExport(nodes, links)
     }
 
     /** All concepts with their aliases — the ubiquitous-language vocabulary for doc matching. */

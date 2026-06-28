@@ -66,6 +66,7 @@ $stele sync                            # runs the WHOLE pipeline from config (so
 # ask it things
 $stele concept Auth                    # a concept: definition + rules + related + docs + code
 $stele explain path/to/file.go         # what a file is part of, and the product rules it must respect
+$stele graph                           # export an interactive HTML map of the whole graph — open it to eyeball quality
 $stele mcp                             # serve the whole graph to an agent over stdio MCP
 ```
 
@@ -137,6 +138,7 @@ A working prototype, not production. What's real today:
 - ✅ **End-to-end works, fully local** — ingest → ontology → docs/rules → human review → MCP, offline (LLM via local Ollama).
 - ✅ **Code layer is high-precision** — symbols→concepts (folder clustering on organized repos) and resolved `calls` from a real indexer.
 - ✅ **One unified graph** — code, docs, and rules all hang off shared concepts; cross-language by construction.
+- ✅ **You can see it** — `stele graph` exports a single offline HTML map (force-directed, searchable, click a concept for its definition + rules + code) so you can eyeball the index quality, not just trust it.
 - ✅ **Stays fresh, re-indexes incrementally** — each file's mtime is tracked, so `ingest symbols` re-parses only what changed (a no-op re-run touches nothing); `stele install-hook` keeps it current on every commit, and `context_for_code` warns the agent when the file it's editing changed since indexing.
 - ⚠️ **Product layer is deterministic-first and noisy** — doc→concept / rule / relation matching is broad keyword & co-occurrence, so it produces many low-confidence *proposals*. The fixes — a stricter **serving gate** and the human **`review`** loop — exist but aren't fully tightened. Treat unconfirmed edges as suggestions.
 - 🔜 **Not built yet** — Figma / design layer, git+PR evidence (*why this code exists*), vector recall (`sqlite-vec`), a tightened quality gate, broader tests.
