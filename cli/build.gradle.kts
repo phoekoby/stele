@@ -1,5 +1,6 @@
 plugins {
     kotlin("jvm")
+    kotlin("plugin.serialization")
     application
     id("com.gradleup.shadow") version "8.3.5"
 }
@@ -12,10 +13,19 @@ dependencies {
     implementation(project(":mcp"))
     implementation("com.github.ajalt.clikt:clikt:4.4.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3") // merge into .mcp.json
+    implementation("com.charleskorn.kaml:kaml:0.61.0") // stele.yml config (YAML ↔ @Serializable)
+
+    testImplementation(kotlin("test"))
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.3")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 kotlin {
     jvmToolchain(21)
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 application {

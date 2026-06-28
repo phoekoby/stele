@@ -3,6 +3,7 @@ package dev.stele.cli.commands
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
+import dev.stele.cli.config.ConfigLoader
 import dev.stele.cli.dbFile
 import dev.stele.cli.steleDir
 import dev.stele.core.db.migrate
@@ -24,6 +25,7 @@ class InitCommand : CliktCommand(
 ) {
     private val noSkill by option("--no-skill", help = "Do not write the Claude Code skill").flag()
     private val noMcp by option("--no-mcp", help = "Do not touch .mcp.json").flag()
+    private val noConfig by option("--no-config", help = "Do not scaffold stele.yml").flag()
 
     override fun run() {
         val dir = steleDir()
@@ -43,8 +45,22 @@ class InitCommand : CliktCommand(
             "  graph:  ${counts.concepts} concepts · ${counts.artifacts} artifacts · " +
                 "${counts.mentions} mentions · ${counts.edges} edges",
         )
+        if (!noConfig) scaffoldConfig()
         if (!noSkill) installSkill()
         if (!noMcp) registerMcp()
+    }
+
+    /** Write a starter `stele.yml` (sources + LLM + review) so `stele sync` works out of the box. */
+    private fun scaffoldConfig() {
+        val target = cwdFile("stele.yml")
+        if (target.exists()) {
+            echo("  config: ${rel(target)} (already present)")
+            return
+        }
+        runCatching {
+            target.writeText(ConfigLoader.STARTER)
+            echo("  config: ${rel(target)} (added — edit it, then `stele sync`)")
+        }
     }
 
     /** Drop the `stele-context` skill into the repo so Claude Code uses Stele automatically. */

@@ -59,13 +59,9 @@ Needs **JDK 17+** (the Gradle wrapper is included). Run **from the repo you want
 stele=$PWD/cli/build/install/stele/bin/stele     # (Windows: ...\stele.bat)
 
 cd /path/to/your/repo
-$stele init                            # creates ./.stele/graph.db
-$stele install-hook                    # (optional) git hooks → keep the index fresh on every commit
-$stele ingest symbols .                # code → candidate concepts (tree-sitter, 15 langs; re-runs are incremental)
-$stele build-ontology --model llama3.1 # LLM names/defines concepts (LOCAL Ollama; or --provider anthropic)
-$stele dedupe-concepts                 # merge folder-twins
-$stele ingest docs .                   # product docs → rules, relations, product language
-$stele review --accept-above 0.8       # confirm the strong links (or run interactive)
+$stele init                            # creates ./.stele/graph.db AND scaffolds stele.yml
+# edit stele.yml — point at your code, docs, and any wiki/Jira URLs — then:
+$stele sync                            # runs the WHOLE pipeline from config (sources → ontology → docs → rules → dedupe → review)
 
 # ask it things
 $stele concept Auth                    # a concept: definition + rules + related + docs + code
@@ -73,7 +69,18 @@ $stele explain path/to/file.go         # what a file is part of, and the product
 $stele mcp                             # serve the whole graph to an agent over stdio MCP
 ```
 
-Everything is **local and offline** — the LLM step defaults to a local [Ollama](https://ollama.com) model; cloud (Anthropic) is opt-in (`--provider anthropic`, needs `ANTHROPIC_API_KEY`).
+**`stele.yml`** is where you configure everything — sources, external doc URLs, the LLM, the review threshold:
+
+```yaml
+llm:     { provider: ollama, model: llama3.1 }     # local & offline by default; anthropic is opt-in
+sources:
+  - { type: symbols, path: "." }                   # code → concepts (tree-sitter, incremental)
+  - { type: docs,    path: "." }                   # Markdown → rules, relations
+  - { type: web,     urls: ["https://your-wiki/spec", "https://jira/browse/PROJ-1"] }
+review:  { acceptAbove: 0.8 }
+```
+
+Adding a new connector (Notion, Slack, an API…) is a small class implementing `Connector` plus one line in the registry. Prefer the manual steps? Each pipeline stage is still its own command (`ingest symbols`, `build-ontology`, `dedupe-concepts`, `ingest docs`, `review`). Everything is **local and offline** — the LLM defaults to a local [Ollama](https://ollama.com) model; cloud (Anthropic) is opt-in (`--provider anthropic`, needs `ANTHROPIC_API_KEY`).
 
 ---
 

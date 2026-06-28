@@ -19,6 +19,7 @@ import dev.stele.cli.commands.RefineRulesCommand
 import dev.stele.cli.commands.ReviewCommand
 import dev.stele.cli.commands.InitCommand
 import dev.stele.cli.commands.StatsCommand
+import dev.stele.cli.commands.SyncCommand
 import dev.stele.cli.commands.TermsCommand
 import dev.stele.cli.commands.UsageCommand
 
@@ -34,6 +35,7 @@ fun main(args: Array<String>) =
     SteleCommand()
         .subcommands(
             InitCommand(),
+            SyncCommand(),
             StatsCommand(),
             IngestCommand().subcommands(
                 IngestCodeCommand(), IngestSymbolsCommand(), IngestDocsCommand(), IngestWebCommand(),
