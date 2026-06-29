@@ -1,0 +1,31 @@
+# Phase-0 benchmark set. Author 40-60 of these against a real multi-repo target,
+# then:  stele eval --golden eval/golden.example.yml --arms stele
+# Add --answer (and a small --model) once you've filled in reference answers.
+#
+# Per question:
+#   concepts:  the concept name(s)/alias(es) a correct retrieval MUST resolve to (ground truth)
+#   artifacts: optional repo-relative files/refs that should appear in the retrieved context
+#   answer:    optional short reference answer — enables LLM-judge scoring under --answer
+name: stele-support-eval
+questions:
+  - id: q1
+    question: "How is authentication implemented right now?"
+    concepts: [Authentication]
+    artifacts: ["apps/auth"]
+    answer: "Authentication is handled by the auth service; fill this in from your repo."
+    tags: [how, iam]
+
+  - id: q2
+    question: "Where does authorization / RBAC live and what rules govern it?"
+    concepts: [Authorization]
+    tags: [where, rules]
+
+  - id: q3
+    question: "What rules apply to invites?"
+    concepts: [Invite]
+    tags: [rules]
+
+  - id: q4
+    question: "How does billing work and which service owns it?"
+    concepts: [Billing]
+    tags: [how, where]
