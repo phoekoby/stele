@@ -16,18 +16,8 @@ interface RetrievalArm {
     fun retrieve(question: String): Retrieved
 }
 
-/** Thrown by arms that are scaffolded but not yet built ([VectorRagArm], [AgenticArm]). */
+/** Thrown by arms that are scaffolded but not yet built (e.g. [AgenticArm]). */
 class ArmNotImplemented(armName: String) : RuntimeException("arm '$armName' not implemented yet")
-
-/**
- * Baseline B — naive vector RAG. TODO(phase-0): chunk docs+code, embed (sqlite-vec
- * or an external embedder), retrieve top-k by cosine, concatenate. Must use the SAME
- * answering model as [SteleArm] so only retrieval differs.
- */
-class VectorRagArm : RetrievalArm {
-    override val name = "vector"
-    override fun retrieve(question: String): Retrieved = throw ArmNotImplemented(name)
-}
 
 /**
  * Baseline C — agentic grep. TODO(phase-0): drive a tool-use loop (glob/grep/read)
