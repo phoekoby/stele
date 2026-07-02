@@ -42,6 +42,7 @@ class EvalCommand : CliktCommand(
     private val answer by option("--answer", help = "Also answer + LLM-judge (needs a model)").flag(default = false)
     private val provider by option("--provider", help = "LLM provider for answering/judging").default("ollama")
     private val model by option("--model")
+    private val judgeModel by option("--judge-model", help = "Judge model (default: --model; use a STRONGER one)")
     private val ollamaUrl by option("--ollama-url").default("http://localhost:11434")
     private val responses by option("--responses", help = "Replay a canned LLM response (offline)")
 
@@ -51,21 +52,22 @@ class EvalCommand : CliktCommand(
         val store = GraphStore(conn)
 
         val selected = armsOpt.split(",").map { it.trim().lowercase() }.toSet()
+        // One embedder choice for every arm that embeds — a fair comparison changes
+        // the retrieval strategy, never the embedding quality.
+        fun embedder(): Embedder = when (embedProvider.lowercase()) {
+            "ollama" -> OllamaEmbedder(embedModel, ollamaUrl)
+            else -> HashingEmbedder(4096)
+        }
         val arms = buildList<RetrievalArm> {
             if ("stele" in selected) add(SteleArm(store))
-            if ("stele-sem" in selected) add(SteleArm(store, embedder = HashingEmbedder(4096)))
-            if ("vector" in selected) {
-                val embedder: Embedder = when (embedProvider.lowercase()) {
-                    "ollama" -> OllamaEmbedder(embedModel, ollamaUrl)
-                    else -> HashingEmbedder()
-                }
-                add(VectorRagArm(File(repo), embedder))
-            }
+            if ("stele-sem" in selected) add(SteleArm(store, embedder = embedder()))
+            if ("vector" in selected) add(VectorRagArm(File(repo), embedder()))
             if ("agentic" in selected) add(AgenticArm())
         }
 
         val llm = if (answer) LlmFactory.build(provider, model, ollamaUrl, responses) else null
-        val runner = EvalRunner(gset, llm?.let { Answerer(it) }, llm?.let { Judge(it) })
+        val judgeLlm = if (answer) LlmFactory.build(provider, judgeModel ?: model, ollamaUrl, responses) else null
+        val runner = EvalRunner(gset, llm?.let { Answerer(it) }, judgeLlm?.let { Judge(it) })
 
         echo("golden: ${gset.name}  (${gset.questions.size} questions, arms: ${selected.joinToString(",")})\n")
         val results = runner.run(arms)

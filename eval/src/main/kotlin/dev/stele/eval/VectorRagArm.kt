@@ -28,7 +28,7 @@ class VectorRagArm(
 
     override fun retrieve(question: String): Retrieved {
         if (index.isEmpty()) return Retrieved(emptyList(), "")
-        val q = embedder.embed(question)
+        val q = embedder.embedQuery(question)
         val top = index
             .map { it to cosine(q, it.vec) }
             .sortedByDescending { it.second }
@@ -54,10 +54,19 @@ class VectorRagArm(
             var i = 0
             while (i < lines.size) {
                 val slice = lines.subList(i, minOf(i + chunkLines, lines.size))
-                val text = slice.joinToString("\n")
+                // Cap by characters too: chars ≠ tokens — base64/minified/CJK content can
+                // hit 2 tokens per char, so even a modest chunk can bust the model's window.
+                val text = slice.joinToString("\n").take(MAX_CHUNK_CHARS)
                 if (text.isNotBlank()) {
                     val ref = if (lines.size > chunkLines) "$rel#L${i + 1}" else rel
-                    chunks += Chunk(ref, text, embedder.embed(text))
+                    // Pathological chunks that still exceed the window are skipped;
+                    // any other embedder failure (e.g. server down) propagates.
+                    val vec = try {
+                        embedder.embed(text)
+                    } catch (e: RuntimeException) {
+                        if (e.message?.contains("context length") == true) null else throw e
+                    }
+                    if (vec != null) chunks += Chunk(ref, text, vec)
                 }
                 i += chunkLines
             }
@@ -70,6 +79,8 @@ class VectorRagArm(
         .filter { it.isFile && it.length() in 1..maxFileBytes && it.extension.lowercase() in TEXT_EXT }
 
     companion object {
+        private const val MAX_CHUNK_CHARS = 2400
+
         private val IGNORE_DIRS = setOf(
             "node_modules", ".git", "dist", "build", ".stele", ".next", "out", "target",
             "vendor", "__pycache__", ".venv", ".idea", ".gradle",

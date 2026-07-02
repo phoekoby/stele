@@ -13,7 +13,10 @@ import kotlin.math.sqrt
 /** Turns text into a unit vector for the [VectorRagArm] baseline. */
 interface Embedder {
     val name: String
+    /** Embed a document/chunk being indexed. */
     fun embed(text: String): FloatArray
+    /** Embed a query. Asymmetric models (e.g. nomic) need distinct task prefixes. */
+    fun embedQuery(text: String): FloatArray = embed(text)
 }
 
 /** Cosine similarity of two equal-length vectors (both expected L2-normalized → just the dot). */
@@ -73,7 +76,17 @@ class OllamaEmbedder(
     private val http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build()
     private val json = Json { ignoreUnknownKeys = true }
 
-    override fun embed(text: String): FloatArray {
+    // nomic is an asymmetric model: it was TRAINED with task prefixes, and skipping them
+    // measurably degrades retrieval — omitting this would strawman the vector baseline.
+    private val isNomic = model.contains("nomic")
+
+    override fun embed(text: String): FloatArray =
+        request(if (isNomic) "search_document: $text" else text)
+
+    override fun embedQuery(text: String): FloatArray =
+        request(if (isNomic) "search_query: $text" else text)
+
+    private fun request(text: String): FloatArray {
         val body = json.encodeToString(Request(model = model, prompt = text))
         val request = HttpRequest.newBuilder(URI.create("$baseUrl/api/embeddings"))
             .timeout(timeout)

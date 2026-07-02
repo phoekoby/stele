@@ -106,7 +106,7 @@ class SteleArm(
 
     private fun resolveSemantic(question: String): List<Concept> {
         val exact = store.resolveConcept(question)
-        val q = embedder!!.embed(question)
+        val q = embedder!!.embedQuery(question)
         val ranked = cards
             .map { (c, v) -> c to cosine(q, v) }
             .filter { it.second > 0.05f }
