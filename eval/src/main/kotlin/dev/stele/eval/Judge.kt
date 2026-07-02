@@ -17,7 +17,12 @@ class Judge(private val llm: LlmClient) {
     companion object {
         private val SYSTEM = """
             You grade a candidate answer against a reference answer for factual agreement and completeness.
-            Reply with a single integer 1-5: 5 = fully correct and complete, 1 = wrong or unsupported.
+            Reply with a single integer 1-5:
+            5 = agrees with the reference and covers its key facts
+            3 = partially correct: some key facts, no contradictions
+            1 = wrong, contradicts the reference, unsupported speculation, OR declines to
+                answer ("I don't know") while the reference contains an answer.
+            A refusal is never worth more than a partially correct attempt.
         """.trimIndent()
     }
 }

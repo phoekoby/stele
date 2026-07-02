@@ -103,26 +103,36 @@ run ≥3 samples per arm, and/or drive the real agent: register Stele as an MCP 
 
 ## Retrieval benchmark (v2 axis) — support-Q&A on Documenso
 
-The second eval axis (`stele eval`, `:eval` module): can the graph resolve a **conversational
-support question** to the right concept and pull the right artifacts, versus naive vector RAG?
-30 real questions (`golden.documenso.yml`) sourced from Documenso's GitHub Discussions + the
-graph's own rule set; graph built by `ingest symbols` + offline canonicalization + `ingest docs`.
+The second eval axis (`stele eval`, `:eval` module): can the graph answer a **conversational
+support question** better than naive vector RAG, with a small model? 30 real questions
+(`golden.documenso.yml`) sourced from Documenso's GitHub Discussions + the graph's own rule
+set. Graph: `ingest symbols` → offline canonicalization (197→50 concepts) → `ingest docs`.
+Answerer **llama3.2:3b** (held constant), judge **llama3.1:8b** (strict rubric), embeddings
+**nomic-embed-text** (with task prefixes) for every arm that embeds.
 
 ```
-arm         concept-hit   artifact-recall   ~tokens   latency
-stele          60.0%          60.4%          2767       9ms     (lexical keyword tally)
-stele-sem      80.0%          70.8%          3089       6ms     (semantic cards, hashing embedder)
-vector          0.0%          33.3%          2515      22ms     (chunk+embed top-k, same embedder)
+arm         concept-hit   artifact-recall   ~tokens   answer-score(3B)
+stele          60.0%          54.2%          2322        3.41 / 5     (lexical resolve)
+stele-sem      90.0%          85.4%          2219        3.68 / 5     (semantic resolve + question-aware drill)
+vector          0.0%          29.2%          2412        3.45 / 5     (chunk+embed top-k)
 ```
 
-Findings:
-- **Ontology-first retrieval doubles artifact recall over vector RAG at equal token cost.**
-- **Semantic concept resolution (Phase 1) is real: +20pp resolution** — and that's with a
-  model-free hashing embedder; its L2 norm self-corrects the doc-heading alias bloat that
-  poisons the lexical tally (`Email` had absorbed half the product vocabulary as aliases).
-- The 6 remaining misses are genuine paraphrases ("share a signing link" ≈ direct-link
-  template, "stuck processing" ≈ sealing job) — the case for a real embedding model.
-- `vector`'s 0% concept-hit is structural (it never names a concept); compare it on recall.
+Findings (each earned by fixing a real methodological bug — keep the order):
+1. **Ontology-first retrieval: 3× the artifact recall of vector RAG at fewer tokens.**
+   And vector's failure is *structural*, not embedding quality: hardening nomic with its
+   task prefixes (un-strawmanning the baseline) left it at ~29% — the retrieval unit
+   (50-line chunk) simply doesn't match the question unit (a concept spanning docs+code+rules).
+2. **Pointers lose to content.** Serving section titles/file paths (high recall!) scored
+   *below* raw chunks on answer quality — a one-shot model can't drill into a pointer.
+   Serving section BODIES + a compact code map fixed it.
+3. **Question-aware drill is the winning hybrid**: resolve the concept by ontology
+   (50-way, 90% hit), then rank the concept's OWN sections by cosine to the question.
+   Graph picks the neighbourhood, vector picks the house: recall 77→85%, score 3.55→3.68.
+4. **Judge rubric matters**: under a strict rubric (refusal ≤ partial answer), vector's
+   fluent-but-loose answers fell 3.91→3.45; stele-sem's grounded ones rose.
+5. **Honest stats**: paired stele-sem vs vector 10 wins / 6 losses / 6 ties — sign test
+   p≈0.45. Direction, not significance. A credible claim needs K≥3 samples/cell and a
+   bigger judged set (same medicine as rule-compliance run 3).
 
-Next: `--answer` run with a held-constant small model + judge; agentic-grep arm; port
-semantic resolution into MCP serving (`concept_context`).
+Next: port semantic resolve + question-aware drill into MCP serving (`concept_context`),
+`stele ask` (two-sided answer: docs-say vs code-does), agentic-grep arm, K≥3 sampling.

@@ -45,20 +45,28 @@ class SteleArm(
                     for (r in rules.take(8)) append("  - ${r.title}\n")
                 }
 
-                val docs = store.describingDocs(c.id)
+                // Doc section BODIES, not just titles: a one-shot answerer can't drill
+                // into a pointer — pointers-only context loses to raw-chunk RAG on
+                // answer quality even when its recall is far higher (measured).
+                // Question-aware drill: the ontology narrows to the right concept, but a
+                // concept can own 100+ sections — serve the ones nearest to the QUESTION
+                // (vector RAG's one real advantage, applied inside the graph neighbourhood).
+                val docs = rankForQuestion(question, store.describingDocs(c.id))
                 if (docs.isNotEmpty()) {
                     append("docs:\n")
-                    for (d in docs.take(6)) {
-                        append("  - ${d.title} (${d.ref})\n")
+                    for (d in docs.take(4)) {
+                        append("  ## ${d.title} (${d.ref})\n")
+                        d.body?.takeIf { it.isNotBlank() }?.let { append("  ${it.take(700).trim()}\n") }
                         refs += d.ref
                     }
                 }
 
+                // Top implementing files by symbol count — a compact code map, not a dump.
                 val impls = store.implementersOf(c.id)
                 val byFile = impls.groupBy { it.ref.substringBefore('#') }
-                append("implemented by ${impls.size} symbols across ${byFile.size} files:\n")
-                for ((file, syms) in byFile.entries.sortedBy { it.key }) {
-                    append("  $file: ${syms.joinToString(", ") { it.title ?: it.ref }}\n")
+                append("implemented by ${impls.size} symbols across ${byFile.size} files, main ones:\n")
+                for ((file, syms) in byFile.entries.sortedByDescending { it.value.size }.take(10)) {
+                    append("  $file: ${syms.take(12).joinToString(", ") { it.title ?: it.ref }}\n")
                     refs += file
                 }
                 append('\n')
@@ -88,6 +96,28 @@ class SteleArm(
         }
         return tally.values.sortedByDescending { it.second }.take(topConcepts).map { it.first }
     }
+
+    /**
+     * Ranks a concept's doc sections by cosine to the question (falls back to the
+     * stored confidence order without an embedder). Section vectors are cached by
+     * artifact id — a concept's sections are embedded once per arm lifetime.
+     */
+    private fun rankForQuestion(question: String, docs: List<dev.stele.core.model.Artifact>): List<dev.stele.core.model.Artifact> {
+        val emb = embedder ?: return docs
+        if (docs.size <= 4) return docs
+        val q = emb.embedQuery(question)
+        return docs.take(40)
+            .map { d ->
+                val v = sectionVecs.getOrPut(d.id) {
+                    emb.embed("${d.title ?: ""}\n${(d.body ?: "").take(1500)}")
+                }
+                d to cosine(q, v)
+            }
+            .sortedByDescending { it.second }
+            .map { it.first }
+    }
+
+    private val sectionVecs = HashMap<String, FloatArray>()
 
     /** Concept cards embedded once, lazily — resolved concepts only (same bar as serving). */
     private val cards: List<Pair<Concept, FloatArray>> by lazy {

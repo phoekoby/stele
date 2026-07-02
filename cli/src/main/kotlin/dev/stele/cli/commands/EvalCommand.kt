@@ -39,6 +39,7 @@ class EvalCommand : CliktCommand(
     private val embedProvider by option("--embed-provider", help = "Vector arm embedder: hashing|ollama").default("hashing")
     private val embedModel by option("--embed-model", help = "Ollama embedding model").default("nomic-embed-text")
     private val verbose by option("--verbose", help = "Per-question rows (misses first)").flag(default = false)
+    private val dump by option("--dump", help = "Write per-question JSONL (incl. answers) for post-hoc analysis")
     private val answer by option("--answer", help = "Also answer + LLM-judge (needs a model)").flag(default = false)
     private val provider by option("--provider", help = "LLM provider for answering/judging").default("ollama")
     private val model by option("--model")
@@ -83,6 +84,26 @@ class EvalCommand : CliktCommand(
                 }
             }
         }
+        dump?.let { path ->
+            File(path).printWriter().use { w ->
+                for ((report, qresults) in results) for (q in qresults) {
+                    w.println(
+                        """{"arm":"${report.arm}","id":"${q.questionId}","concepts":"${esc(q.resolvedConcepts.joinToString(", "))}",""" +
+                            """"hit":${q.conceptHit},"recall":${if (q.artifactRecall.isNaN()) "null" else q.artifactRecall},""" +
+                            """"tokens":${q.approxTokens},"score":${q.score},"answer":"${esc(q.answer ?: "")}"}""",
+                    )
+                }
+            }
+            echo("\nper-question dump: $path")
+        }
         conn.close()
+    }
+
+    private fun esc(s: String): String = buildString {
+        for (ch in s) when (ch) {
+            '\\' -> append("\\\\"); '"' -> append("\\\"")
+            '\n' -> append("\\n"); '\r' -> {}; '\t' -> append("\\t")
+            else -> append(ch)
+        }
     }
 }
