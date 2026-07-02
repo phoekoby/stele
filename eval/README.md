@@ -100,3 +100,29 @@ because auto-generated checkers are noisier (many tasks both-fail) and the rule 
 Grow `dataset.jsonl` from confirmed `constrains` rules in the graph (each rule → a trap task + a static check),
 run ≥3 samples per arm, and/or drive the real agent: register Stele as an MCP server and run
 `claude -p "<task>"` on a clean Sb0rka checkout twice (MCP on / off), then run the same checks on the diffs.
+
+## Retrieval benchmark (v2 axis) — support-Q&A on Documenso
+
+The second eval axis (`stele eval`, `:eval` module): can the graph resolve a **conversational
+support question** to the right concept and pull the right artifacts, versus naive vector RAG?
+30 real questions (`golden.documenso.yml`) sourced from Documenso's GitHub Discussions + the
+graph's own rule set; graph built by `ingest symbols` + offline canonicalization + `ingest docs`.
+
+```
+arm         concept-hit   artifact-recall   ~tokens   latency
+stele          60.0%          60.4%          2767       9ms     (lexical keyword tally)
+stele-sem      80.0%          70.8%          3089       6ms     (semantic cards, hashing embedder)
+vector          0.0%          33.3%          2515      22ms     (chunk+embed top-k, same embedder)
+```
+
+Findings:
+- **Ontology-first retrieval doubles artifact recall over vector RAG at equal token cost.**
+- **Semantic concept resolution (Phase 1) is real: +20pp resolution** — and that's with a
+  model-free hashing embedder; its L2 norm self-corrects the doc-heading alias bloat that
+  poisons the lexical tally (`Email` had absorbed half the product vocabulary as aliases).
+- The 6 remaining misses are genuine paraphrases ("share a signing link" ≈ direct-link
+  template, "stuck processing" ≈ sealing job) — the case for a real embedding model.
+- `vector`'s 0% concept-hit is structural (it never names a concept); compare it on recall.
+
+Next: `--answer` run with a held-constant small model + judge; agentic-grep arm; port
+semantic resolution into MCP serving (`concept_context`).

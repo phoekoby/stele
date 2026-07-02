@@ -34,10 +34,11 @@ class EvalCommand : CliktCommand(
 ) {
     private val golden by option("--golden", help = "Golden Q&A YAML file").required()
     private val db by option("--db", help = "Graph db (defaults to ./.stele/graph.db)")
-    private val armsOpt by option("--arms", help = "Comma-separated: stele,vector,agentic").default("stele")
+    private val armsOpt by option("--arms", help = "Comma-separated: stele,stele-sem,vector,agentic").default("stele")
     private val repo by option("--repo", help = "Repo root the vector arm indexes").default(".")
     private val embedProvider by option("--embed-provider", help = "Vector arm embedder: hashing|ollama").default("hashing")
     private val embedModel by option("--embed-model", help = "Ollama embedding model").default("nomic-embed-text")
+    private val verbose by option("--verbose", help = "Per-question rows (misses first)").flag(default = false)
     private val answer by option("--answer", help = "Also answer + LLM-judge (needs a model)").flag(default = false)
     private val provider by option("--provider", help = "LLM provider for answering/judging").default("ollama")
     private val model by option("--model")
@@ -52,6 +53,7 @@ class EvalCommand : CliktCommand(
         val selected = armsOpt.split(",").map { it.trim().lowercase() }.toSet()
         val arms = buildList<RetrievalArm> {
             if ("stele" in selected) add(SteleArm(store))
+            if ("stele-sem" in selected) add(SteleArm(store, embedder = HashingEmbedder(4096)))
             if ("vector" in selected) {
                 val embedder: Embedder = when (embedProvider.lowercase()) {
                     "ollama" -> OllamaEmbedder(embedModel, ollamaUrl)
@@ -66,7 +68,19 @@ class EvalCommand : CliktCommand(
         val runner = EvalRunner(gset, llm?.let { Answerer(it) }, llm?.let { Judge(it) })
 
         echo("golden: ${gset.name}  (${gset.questions.size} questions, arms: ${selected.joinToString(",")})\n")
-        runner.run(arms).let { results -> renderReport(results.map { it.first }) { echo(it) } }
+        val results = runner.run(arms)
+        renderReport(results.map { it.first }) { echo(it) }
+        if (verbose) {
+            for ((report, qresults) in results) {
+                if (qresults.isEmpty()) continue
+                echo("\n[${report.arm}] per question (✗ = concept miss):")
+                for (q in qresults.sortedBy { it.conceptHit }) {
+                    val mark = if (q.conceptHit) "✓" else "✗"
+                    val recall = if (q.artifactRecall.isNaN()) " n/a" else "%3.0f%%".format(q.artifactRecall * 100)
+                    echo("  $mark ${q.questionId}  recall $recall  ~${q.approxTokens}tok  → ${q.resolvedConcepts.joinToString(", ").ifEmpty { "—" }}")
+                }
+            }
+        }
         conn.close()
     }
 }

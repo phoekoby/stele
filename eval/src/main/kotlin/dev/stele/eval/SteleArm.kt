@@ -4,21 +4,28 @@ import dev.stele.core.model.Concept
 import dev.stele.core.store.GraphStore
 
 /**
- * The arm under test. Resolves domain concept(s) from a natural-language question
- * with the CURRENT lexical resolver, then assembles the same context slice the MCP
- * `concept_context` tool serves (definition, rules, related, docs, implementing code).
+ * The arm under test. Resolves domain concept(s) from a natural-language question,
+ * then assembles the same context slice the MCP `concept_context` tool serves
+ * (definition, rules, related, docs, implementing code).
  *
- * Phase 1 (NL concept resolution via embeddings) is meant to replace [resolve] — this
- * arm is exactly where that win has to show up against the vector/agentic baselines.
+ * Two resolvers, A/B-tested as separate arms:
+ *  - `stele` (embedder = null) — the CURRENT lexical resolver: per-keyword substring
+ *    tally. Suffers from alias bloat (a concept whose doc-heading aliases contain half
+ *    the product vocabulary outranks the right one on common words).
+ *  - `stele-sem` — Phase-1 semantic resolution: each resolved concept gets a card
+ *    (name + definition + aliases) embedded once; the question is embedded and ranked
+ *    by cosine. L2 normalisation self-corrects alias bloat: a bloated card dilutes
+ *    every word's weight, so distinctive concepts win.
  */
 class SteleArm(
     private val store: GraphStore,
     private val topConcepts: Int = 2,
+    private val embedder: Embedder? = null,
+    override val name: String = if (embedder == null) "stele" else "stele-sem",
 ) : RetrievalArm {
-    override val name = "stele"
 
     override fun retrieve(question: String): Retrieved {
-        val concepts = resolve(question)
+        val concepts = if (embedder == null) resolve(question) else resolveSemantic(question)
         if (concepts.isEmpty()) return Retrieved(emptyList(), "")
         val refs = mutableListOf<String>()
         val context = buildString {
@@ -80,6 +87,32 @@ class SteleArm(
             }
         }
         return tally.values.sortedByDescending { it.second }.take(topConcepts).map { it.first }
+    }
+
+    /** Concept cards embedded once, lazily — resolved concepts only (same bar as serving). */
+    private val cards: List<Pair<Concept, FloatArray>> by lazy {
+        store.searchConcepts("", limit = 10_000)
+            .filter { it.definition != null }
+            .map { c -> c to embedder!!.embed(card(c)) }
+    }
+
+    /** Name is repeated to outweigh any single alias; junk aliases only dilute the card. */
+    private fun card(c: Concept): String = buildString {
+        repeat(3) { append(c.name).append(' ') }
+        c.boundedContext?.let { append(it).append(' ') }
+        c.definition?.let { append(it).append(' ') }
+        append(c.aliases.joinToString(" "))
+    }
+
+    private fun resolveSemantic(question: String): List<Concept> {
+        val exact = store.resolveConcept(question)
+        val q = embedder!!.embed(question)
+        val ranked = cards
+            .map { (c, v) -> c to cosine(q, v) }
+            .filter { it.second > 0.05f }
+            .sortedByDescending { it.second }
+            .map { it.first }
+        return (listOfNotNull(exact) + ranked).distinctBy { it.id }.take(topConcepts)
     }
 
     companion object {
