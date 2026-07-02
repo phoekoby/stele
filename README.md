@@ -6,6 +6,60 @@ A *stele* is a stone slab carrying the same text in several scripts (the Rosetta
 
 ---
 
+## Measured results (before any claims)
+
+Two independent evaluations on real repositories test the core thesis. Full protocol, golden
+sets, per-run numbers and the iteration history live in [`eval/`](eval/README.md).
+
+**1. Support Q&A with a small model** — 30 real user questions taken from
+[Documenso](https://github.com/documenso/documenso)'s GitHub Discussions; the answering model
+is held constant (**llama3.2:3b**), only the retrieval changes; judge llama3.1:8b under a
+strict rubric; the same embedding model (nomic, task-prefixed) for every arm that embeds:
+
+| retrieval arm | concept-hit | artifact-recall | ~tokens | answer score |
+|---|---|---|---|---|
+| **Stele — semantic resolve + question-aware drill** | **90%** | **85.4%** | **2219** | **3.68 / 5** |
+| Stele — lexical resolve (baseline self) | 60% | 54.2% | 2322 | 3.41 / 5 |
+| naive vector RAG (chunk + embed + top-k) | —¹ | 29.2% | 2412 | 3.45 / 5 |
+
+The chain holds end-to-end: right concept (90%) → right artifacts (**2.9×** the recall of
+vector RAG) → fewer tokens → better answers from a 3B model (paired wins 10–6, 6 ties)².
+Vector RAG's failure is **structural, not embedding quality**: strengthening its embedder
+(proper nomic task prefixes) did not move it — a 50-line chunk is the wrong retrieval unit
+for a question about a concept that spans docs + code + rules.
+
+**2. Rule-compliance of a coding agent** — 41 trap tasks on 2 repos (each task seeded from a
+real product rule), deterministic regex/static checkers, no LLM judge:
+
+```
+plain 24%   =   ast-index (code structure) 24%   <   Stele (concepts + rules) 39%
+McNemar ast-index → Stele: b=6, c=0, p = 0.031 (significant)
+```
+
+Code structure carries no product rules — the concept layer does. The two axes are
+independent measurements of the same claim.
+
+**Why it works**
+- **The retrieval unit matches the question unit.** Questions are about *concepts*; a concept
+  spans docs + code + rules. The ontology resolves the concept first (50-way, 90% hit).
+- **Hybrid drill: the graph picks the neighbourhood, the vector picks the house.** Sections
+  *inside* the resolved concept are ranked by similarity to the question (+8pp recall,
+  +0.13 answer score from this step alone).
+- **Context carries content, not pointers** — section bodies, product rules and a compact
+  code map; things a small model can actually answer from.
+
+**Honesty box.** Every eval iteration fixed a methodology bug *in the baseline's favour*
+(un-strawmanned the embedder; kept the run where our pointer-only context *lost*; a judge
+rubric that stopped rewarding refusals). Remaining limits: the Q&A axis is N=22 judged
+questions, single-sample (paired sign test p≈0.45 — direction, not significance yet); one
+repo; an 8B judge is noisy; ~8% of the ingested "product docs" turned out to be the repo's
+own AI-agent plans — a typed agent layer is planned, numbers will be re-run.
+
+¹ vector RAG never names a concept — compare it on recall and score.
+² judged subset: the 22 questions with reference answers.
+
+---
+
 ## Why this exists (the impact)
 
 AI coding agents are good at *what* the code is — structure, symbols, call graphs. Tools like **GitNexus** and **ast-index** do that well. But they don't know *why* the code exists: the **product rules**, the domain language, the design intent.
