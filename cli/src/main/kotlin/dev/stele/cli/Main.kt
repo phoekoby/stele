@@ -5,6 +5,7 @@ import com.github.ajalt.clikt.core.subcommands
 import dev.stele.cli.commands.BuildOntologyCommand
 import dev.stele.cli.commands.ConceptCommand
 import dev.stele.cli.commands.DedupeCommand
+import dev.stele.cli.commands.EvalCommand
 import dev.stele.cli.commands.ExplainCommand
 import dev.stele.cli.commands.GraphCommand
 import dev.stele.cli.commands.IngestAstIndexCommand
@@ -52,6 +53,7 @@ fun main(args: Array<String>) =
             ConceptCommand(),
             ExplainCommand(),
             GraphCommand(),
+            EvalCommand(),
             McpCommand(),
             UsageCommand(),
             InstallHookCommand(),

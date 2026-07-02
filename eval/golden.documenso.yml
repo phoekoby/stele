@@ -1,0 +1,212 @@
+# Golden Q&A set — Documenso (github.com/documenso/documenso), authored 2026-07.
+# Sources: real user questions from GitHub Discussions (#numbers in comments), the
+# product-rule set Stele extracted from the repo docs, and the docs tree itself.
+# Ground truth verified against the actual repo layout (packages/lib/server-only/…,
+# apps/docs/content/docs/…) and the canonical concept graph built by `stele sync`.
+#
+# Question types (tags): how — product behaviour; where — which code owns it;
+# rules — constraints/invariants; reconcile — docs-vs-code agreement; selfhost — ops.
+name: documenso-support-eval
+questions:
+  # --- documents & signing flow -------------------------------------------------
+  - id: d01 # discussion #1936
+    question: "Can I create a document that has no recipient emails and just share a signing link?"
+    concepts: [Template]
+    artifacts: ["packages/lib/server-only/template"]
+    answer: "Yes — via direct link templates: a template gets a reusable direct link URL, anyone opening it can sign without being emailed as a recipient."
+    tags: [how]
+
+  - id: d02 # discussion #2013
+    question: "We sent a document to the wrong person. What happens to signing statuses if we update a recipient on a pending document?"
+    concepts: [Recipient, Document]
+    artifacts: ["packages/lib/server-only/recipient"]
+    tags: [how]
+
+  - id: d03 # discussion #2470, #2042
+    question: "A document is stuck on 'Processing document' after everyone signed. What is happening under the hood?"
+    concepts: [Signing, BackgroundJob]
+    artifacts: ["packages/lib/jobs", "packages/signing"]
+    answer: "After the last recipient completes, a background job seals the PDF with the instance's signing certificate. If the certificate is missing or invalid the sealing job fails and the document stays in processing."
+    tags: [how, selfhost]
+
+  - id: d04
+    question: "Can recipients be required to sign in a specific order, one after another?"
+    concepts: [Signing, Recipient]
+    artifacts: ["apps/docs/content/docs"]
+    answer: "Yes — enabling signing order makes recipients sign sequentially; the next recipient is only asked once the previous one completed."
+    tags: [how]
+
+  - id: d05 # rule from the graph (prior eval D2)
+    question: "When a recipient's signing period expires, does the whole document become expired?"
+    concepts: [Recipient, Document]
+    answer: "No — recipient expiry does not expire the document. The document stays PENDING; only the recipient is marked expired."
+    tags: [rules, reconcile]
+
+  - id: d06 # rule from the graph (prior eval D1)
+    question: "Can a completed document be deleted?"
+    concepts: [Document]
+    artifacts: ["packages/lib/server-only/document"]
+    answer: "A completed document is never hard-deleted — deleting it only hides it from the owner's view. Only pending/draft documents can be truly cancelled."
+    tags: [rules]
+
+  - id: d07 # rule from the graph (prior eval D5)
+    question: "If a document's visibility is set to admins only, can the person who created it still see it?"
+    concepts: [Document]
+    answer: "Yes — the document owner can always view their own document; visibility restrictions apply to other team members."
+    tags: [rules]
+
+  - id: d08
+    question: "What does the audit trail record for a signed document, for legal evidence?"
+    concepts: [AuditLog]
+    artifacts: ["packages/lib/types/document-audit-logs.ts"]
+    answer: "Every document event — created, viewed, field signed, email sent, completed — with the actor, IP address, user agent and timestamp; it backs the signing certificate."
+    tags: [how]
+
+  - id: d09 # discussion #1587
+    question: "Can a signer download the document to review it before signing?"
+    concepts: [Envelope, Document]
+    tags: [how]
+
+  - id: d10
+    question: "Can documents and templates be organised into folders?"
+    concepts: [Folder]
+    artifacts: ["packages/lib/server-only/folder"]
+    answer: "Yes — documents and templates can be placed in folders and moved between them."
+    tags: [how]
+
+  # --- fields & authoring --------------------------------------------------------
+  - id: d11 # discussion #1784, #1411
+    question: "How do I control text field formatting in a template — alignment, size, multi-line?"
+    concepts: [Field]
+    artifacts: ["packages/lib/types/field-meta.ts"]
+    tags: [how]
+
+  - id: d12
+    question: "Does Documenso automatically detect where to place fields on an uploaded document?"
+    concepts: [AI, Field]
+    artifacts: ["packages/lib/server-only/ai"]
+    answer: "Yes — an AI-assisted step can detect fields and recipients on the uploaded document and auto-place them."
+    tags: [how]
+
+  - id: d13 # discussion #1328
+    question: "Can field positions be set dynamically with text tags or placeholders instead of dragging them?"
+    concepts: [Field]
+    artifacts: ["apps/docs/content/docs"]
+    tags: [how]
+
+  - id: d14 # discussion #2025-era docx support
+    question: "Can I upload a DOCX file, or only PDFs? What happens to non-PDF uploads?"
+    concepts: [DocumentConversion]
+    artifacts: ["packages/lib/server-only/document-conversion"]
+    answer: "DOCX uploads are converted to PDF on ingestion; signing always operates on the PDF."
+    tags: [how]
+
+  # --- identity & access ----------------------------------------------------------
+  - id: d15 # discussion #1602, #1824
+    question: "Anyone can register on our self-hosted instance with any email. Can we restrict who is allowed to sign up?"
+    concepts: [Authentication, SiteSettings]
+    answer: "Yes — self-hosters can disable public signup (signup restriction setting/env flag) so only invited or provisioned users get accounts."
+    tags: [how, selfhost]
+
+  - id: d16
+    question: "How does two-factor authentication work, and what happens if a user loses their authenticator app?"
+    concepts: [TwoFactorAuthentication]
+    artifacts: ["packages/lib/server-only/2fa"]
+    answer: "2FA uses a TOTP authenticator app; backup recovery codes issued at enrolment let a user who lost the device sign in and reset 2FA."
+    tags: [how]
+
+  - id: d17
+    question: "How do organisation members sign in through our company SSO?"
+    concepts: [AuthenticationPortal]
+    artifacts: ["packages/trpc/server/enterprise-router"]
+    answer: "Enterprise organisations get an SSO authentication portal — members sign in via the organisation's OIDC identity provider through the portal URL."
+    tags: [how]
+
+  - id: d18
+    question: "Which per-document authentication options can be required from a signer before they can sign?"
+    concepts: [DocumentAuthentication]
+    artifacts: ["packages/lib/types/document-auth.ts"]
+    tags: [how, rules]
+
+  # --- API & integrations -----------------------------------------------------------
+  - id: d19 # rule from the graph (prior eval D6)
+    question: "Are API tokens scoped to a team? Can a token read documents of other teams?"
+    concepts: [ApiToken, Team]
+    artifacts: ["packages/lib/server-only/public-api"]
+    answer: "Tokens are scoped: a team-scoped token only reaches that team's documents and can never read other teams' data."
+    tags: [rules]
+
+  - id: d20 # discussion #1377
+    question: "How do I upload a PDF when creating a document through the REST API?"
+    concepts: [Document, Storage]
+    artifacts: ["apps/docs/content/docs/developers"]
+    answer: "Create the document via the API, then upload the PDF binary to the returned pre-signed upload URL."
+    tags: [how]
+
+  - id: d21 # discussion #2191
+    question: "Using API v2, where do I get the signing URL for each recipient after creating a document?"
+    concepts: [Recipient]
+    tags: [how]
+
+  - id: d22
+    question: "Which events can trigger webhooks, and how are webhook payloads signed?"
+    concepts: [Webhook]
+    artifacts: ["packages/lib/server-only/webhooks", "apps/docs/content/docs/developers/webhooks"]
+    answer: "Document lifecycle events (created, sent, opened, signed, completed, rejected) can trigger webhooks; payloads are signed with the webhook's secret so receivers can verify authenticity."
+    tags: [how]
+
+  - id: d23
+    question: "How do I embed the signing experience inside my own web app?"
+    concepts: [Embedding]
+    artifacts: ["apps/docs/content/docs/developers/embedding"]
+    answer: "Use the embedding SDK (or an iframe) with a presign token: your backend creates the token, the embed component renders the signing flow in your app."
+    tags: [how]
+
+  # --- billing & limits ----------------------------------------------------------
+  - id: d24 # discussion #1381
+    question: "The app says 3 of 5 documents used but I don't have any documents in my account. How are document limits counted?"
+    concepts: [PlanLimits, Billing]
+    artifacts: ["packages/ee/server-only/limits"]
+    tags: [how, rules]
+
+  - id: d25 # discussion #2534
+    question: "The admin panel shows 'Invalid License Type — your instance is using features that are not part of your license.' What triggers this?"
+    concepts: [License]
+    artifacts: ["packages/lib/server-only/license"]
+    answer: "The instance is using enterprise features whose claims are not covered by the current license; the license validator compares enabled features against the license claims."
+    tags: [selfhost, rules]
+
+  # --- email & branding -------------------------------------------------------------
+  - id: d26 # discussions #2039, #2286, #1421, #1299
+    question: "Our self-hosted instance doesn't send any emails — no signing requests, no verification mail. Where is email sending configured?"
+    concepts: [Email, EmailTransport]
+    artifacts: ["packages/email", "apps/docs/content/docs/self-hosting"]
+    answer: "Email goes through the configured SMTP transport (host, port, user, password, FROM address via environment/config). Without a working transport no signing or verification mail is sent."
+    tags: [selfhost, how]
+
+  - id: d27 # discussion #1962
+    question: "I customised our branding, but emails still show the Documenso logo and links. Is email branding supported?"
+    concepts: [Branding, Email]
+    artifacts: ["packages/lib/server-only/branding"]
+    tags: [how]
+
+  - id: d28
+    question: "Can signing emails be sent from our own domain instead of a documenso.com address?"
+    concepts: [EmailDomain, OrganisationEmail]
+    answer: "Yes — organisations can verify a custom email domain and add organisation sender emails, after which signing mail is sent from that domain."
+    tags: [how]
+
+  # --- compliance & platform -------------------------------------------------------
+  - id: d29
+    question: "What is the difference between SES, AES and QES signature levels, and which is the default?"
+    concepts: [SignatureLevel]
+    artifacts: ["apps/docs/content/docs/compliance/signature-levels.mdx", "packages/lib/server-only/signature-level"]
+    answer: "SES is the default simple electronic signature; AES adds strong signer identification; QES is a qualified signature via a trust provider and is legally equivalent to handwritten."
+    tags: [how, rules]
+
+  - id: d30 # discussions #1280, #1843, #1928, #2042
+    question: "What signing certificate does a self-hosted instance need and how is it configured?"
+    concepts: [Signing]
+    artifacts: ["apps/docs/content/docs/self-hosting/configuration/signing-certificate", "packages/lib/server-only/cert"]
+    answer: "A .p12 signing certificate used to seal completed PDFs — configured via env as a file path plus passphrase, or as base64 certificate contents."
+    tags: [selfhost, how]

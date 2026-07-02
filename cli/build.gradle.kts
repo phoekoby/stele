@@ -11,6 +11,7 @@ dependencies {
     implementation(project(":connectors"))
     implementation(project(":resolver"))
     implementation(project(":mcp"))
+    implementation(project(":eval"))
     implementation("com.github.ajalt.clikt:clikt:4.4.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3") // merge into .mcp.json
     implementation("com.charleskorn.kaml:kaml:0.61.0") // stele.yml config (YAML ↔ @Serializable)
