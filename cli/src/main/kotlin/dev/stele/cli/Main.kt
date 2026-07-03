@@ -6,6 +6,7 @@ import dev.stele.cli.commands.AskCommand
 import dev.stele.cli.commands.BuildOntologyCommand
 import dev.stele.cli.commands.ConceptCommand
 import dev.stele.cli.commands.DedupeCommand
+import dev.stele.cli.commands.DriftCommand
 import dev.stele.cli.commands.EmbedCommand
 import dev.stele.cli.commands.EvalCommand
 import dev.stele.cli.commands.ExplainCommand
@@ -56,6 +57,7 @@ fun main(args: Array<String>) =
             SearchCommand(),
             AskCommand(),
             ConceptCommand(),
+            DriftCommand(),
             ExplainCommand(),
             GraphCommand(),
             EvalCommand(),

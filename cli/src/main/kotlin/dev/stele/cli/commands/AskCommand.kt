@@ -6,6 +6,7 @@ import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.int
+import dev.stele.cli.CodeSlices
 import dev.stele.cli.EmbedderFactory
 import dev.stele.cli.LlmFactory
 import dev.stele.cli.config.ConfigLoader
@@ -101,48 +102,16 @@ class AskCommand : CliktCommand(
             }
         }
 
-        val impls = store.implementersOf(c.id)
-        val byFile = impls.groupBy { it.ref.substringBefore('#') }
-        // Question-aware code drill too: prefer files/symbols whose NAMES share tokens
-        // with the question (deleteDocument for "can a document be deleted?"), then size.
-        val qTokens = tokens(question)
-        fun symScore(title: String?) = tokens(title ?: "").count { it in qTokens }
-        val topFiles = byFile.entries
-            .sortedWith(compareByDescending<Map.Entry<String, List<dev.stele.core.model.Artifact>>> { e -> e.value.maxOf { symScore(it.title) } }
-                .thenByDescending { it.value.size })
-            .take(6)
-        append("\nCODE DOES (fact) — ${impls.size} symbols across ${byFile.size} files:\n")
-        val spans = store.symbolSpans(topFiles.take(3).flatMap { it.value }.map { it.id })
-        var bodies = 0
-        for ((file, syms) in topFiles) {
-            val ranked = syms.sortedByDescending { symScore(it.title) }
-            append("  $file: ${ranked.take(10).joinToString(", ") { it.title ?: it.ref }}\n")
-            if (bodies >= MAX_BODIES || repoRoot == null) continue
-            val src = File(repoRoot, file).takeIf { it.isFile }?.let { runCatching { it.readLines() }.getOrNull() } ?: continue
-            for (s in ranked) {
-                if (bodies >= MAX_BODIES) break
-                val span = spans[s.id] ?: continue
-                val lines = src.subList((span.first - 1).coerceIn(0, src.size), span.last.coerceAtMost(src.size))
-                if (lines.isEmpty()) continue
-                append("    ─ ${s.title} ($file:${span.first}):\n")
-                for (line in lines.take(MAX_BODY_LINES)) append("      $line\n")
-                bodies++
-            }
+        // Question-aware code drill: symbols ranked by name-token overlap with the
+        // question, real bodies via spans (shared with `stele drift`).
+        val slice = CodeSlices.forConcept(store, c.id, question, repoRoot)
+        if (slice.text.isNotBlank()) {
+            append("\nCODE DOES (fact):\n")
+            append(slice.text)
         }
     }
 
-    /** camelCase/kebab/snake-aware lowercase tokens. */
-    private fun tokens(s: String): Set<String> =
-        s.replace(Regex("([a-z0-9])([A-Z])"), "$1 $2")
-            .lowercase()
-            .split(Regex("[^a-z0-9]+"))
-            .filter { it.length >= 3 }
-            .toSet()
-
     companion object {
-        private const val MAX_BODIES = 4
-        private const val MAX_BODY_LINES = 40
-
         private val SYSTEM = """
             You are a support engineer answering a product question for a colleague.
             The context has two sides: DOCS SAY (intent: docs + product rules) and CODE DOES (fact: real code).
