@@ -1,5 +1,9 @@
 package dev.stele.eval
 
+import dev.stele.core.embed.Embedder
+import dev.stele.core.embed.conceptCard
+import dev.stele.core.embed.cosine
+import dev.stele.core.embed.sectionCard
 import dev.stele.core.model.Concept
 import dev.stele.core.store.GraphStore
 
@@ -97,22 +101,20 @@ class SteleArm(
         return tally.values.sortedByDescending { it.second }.take(topConcepts).map { it.first }
     }
 
-    /**
-     * Ranks a concept's doc sections by cosine to the question (falls back to the
-     * stored confidence order without an embedder). Section vectors are cached by
-     * artifact id — a concept's sections are embedded once per arm lifetime.
-     */
+    // The arm now measures the PRODUCT path: stored vectors written by `stele embed`
+    // (what MCP serving uses). On-the-fly embedding remains as a fallback so the eval
+    // still runs on a graph where `stele embed` hasn't been run yet.
+    private val hasStoredConcepts by lazy { store.embeddedIds("concept_vectors", embedder!!.name).isNotEmpty() }
+    private val hasStoredSections by lazy { store.embeddedIds("section_vectors", embedder!!.name).isNotEmpty() }
+
+    /** Ranks a concept's doc sections by cosine to the question. */
     private fun rankForQuestion(question: String, docs: List<dev.stele.core.model.Artifact>): List<dev.stele.core.model.Artifact> {
         val emb = embedder ?: return docs
         if (docs.size <= 4) return docs
         val q = emb.embedQuery(question)
+        if (hasStoredSections) return store.rankDocsForQuery(docs, q, emb.name)
         return docs.take(40)
-            .map { d ->
-                val v = sectionVecs.getOrPut(d.id) {
-                    emb.embed("${d.title ?: ""}\n${(d.body ?: "").take(1500)}")
-                }
-                d to cosine(q, v)
-            }
+            .map { d -> d to cosine(q, sectionVecs.getOrPut(d.id) { emb.embed(sectionCard(d)) }) }
             .sortedByDescending { it.second }
             .map { it.first }
     }
@@ -121,27 +123,20 @@ class SteleArm(
 
     /** Concept cards embedded once, lazily — resolved concepts only (same bar as serving). */
     private val cards: List<Pair<Concept, FloatArray>> by lazy {
-        store.searchConcepts("", limit = 10_000)
-            .filter { it.definition != null }
-            .map { c -> c to embedder!!.embed(card(c)) }
-    }
-
-    /** Name is repeated to outweigh any single alias; junk aliases only dilute the card. */
-    private fun card(c: Concept): String = buildString {
-        repeat(3) { append(c.name).append(' ') }
-        c.boundedContext?.let { append(it).append(' ') }
-        c.definition?.let { append(it).append(' ') }
-        append(c.aliases.joinToString(" "))
+        store.resolvedConcepts().map { c -> c to embedder!!.embed(conceptCard(c)) }
     }
 
     private fun resolveSemantic(question: String): List<Concept> {
         val exact = store.resolveConcept(question)
         val q = embedder!!.embedQuery(question)
-        val ranked = cards
-            .map { (c, v) -> c to cosine(q, v) }
-            .filter { it.second > 0.05f }
-            .sortedByDescending { it.second }
-            .map { it.first }
+        val ranked = if (hasStoredConcepts) {
+            store.resolveSemanticConcepts(q, embedder.name, topK = topConcepts + 1)
+        } else {
+            cards.map { (c, v) -> c to cosine(q, v) }
+                .filter { it.second > 0.05f }
+                .sortedByDescending { it.second }
+                .map { it.first }
+        }
         return (listOfNotNull(exact) + ranked).distinctBy { it.id }.take(topConcepts)
     }
 

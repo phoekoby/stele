@@ -106,7 +106,14 @@ fun ingestSymbols(store: GraphStore, rootArg: String): SymbolIngestResult {
                     source = "code",
                     ref = symbolRef,
                     title = name,
-                    attrs = mapOf("symbolKind" to node.type, "via" to "treesitter"),
+                    attrs = mapOf(
+                        "symbolKind" to node.type,
+                        "via" to "treesitter",
+                        // 1-based line span — lets serving pull the BODY of a symbol
+                        // (`stele ask` / context drill), not just its path.
+                        "startLine" to (node.startPoint.row + 1).toString(),
+                        "endLine" to (node.endPoint.row + 1).toString(),
+                    ),
                 )
                 symbolRefs.add(symbolRef)
 

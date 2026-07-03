@@ -1,5 +1,8 @@
 package dev.stele.eval
 
+import dev.stele.core.embed.Embedder
+import dev.stele.core.embed.cosine
+import dev.stele.resolver.HashingEmbedder
 import java.io.File
 
 /**

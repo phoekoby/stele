@@ -1,5 +1,6 @@
 package dev.stele.core.store
 
+import dev.stele.core.embed.cosine
 import dev.stele.core.model.Artifact
 import dev.stele.core.model.ArtifactKind
 import dev.stele.core.model.CallEdge
@@ -786,6 +787,135 @@ class GraphStore(private val conn: Connection) {
             st.executeQuery().use { rs -> buildList { while (rs.next()) add(rowToArtifact(rs)) } }
         }
 
+    // --- semantic layer: stored embeddings (concept cards + doc sections) -------------
+    // Vectors are computed once by `stele embed` (part of `sync`) and stored as
+    // little-endian float32 BLOBs, so serving never needs a live embedding model:
+    // resolve/drill just read + cosine. With no vectors, callers fall back to lexical.
+
+    fun storeConceptVector(conceptId: String, model: String, vec: FloatArray) =
+        storeVector("concept_vectors", "concept_id", conceptId, model, vec)
+
+    fun storeSectionVector(artifactId: String, model: String, vec: FloatArray) =
+        storeVector("section_vectors", "artifact_id", artifactId, model, vec)
+
+    private fun storeVector(table: String, keyCol: String, id: String, model: String, vec: FloatArray) {
+        conn.prepareStatement("INSERT OR REPLACE INTO $table ($keyCol, model, vec) VALUES (?, ?, ?)").use { st ->
+            st.setString(1, id)
+            st.setString(2, model)
+            st.setBytes(3, vecToBlob(vec))
+            st.executeUpdate()
+        }
+    }
+
+    /** Ids that already have a vector under this model — for an idempotent `stele embed`. */
+    fun embeddedIds(table: String, model: String): Set<String> = runCatching {
+        val keyCol = if (table == "concept_vectors") "concept_id" else "artifact_id"
+        conn.prepareStatement("SELECT $keyCol AS k FROM $table WHERE model = ?").use { st ->
+            st.setString(1, model)
+            st.executeQuery().use { rs -> buildSet { while (rs.next()) add(rs.getString("k")) } }
+        }
+    }.getOrDefault(emptySet()) // pre-004 graph: no table yet
+
+    /**
+     * Semantic concept resolution: cosine-rank RESOLVED concepts' stored card vectors
+     * against a query vector. Empty when no vectors exist for this model (callers
+     * then fall back to the lexical path).
+     */
+    fun resolveSemanticConcepts(queryVec: FloatArray, model: String, topK: Int = 2, floor: Float = 0.05f): List<Concept> =
+        runCatching {
+            conn.prepareStatement(
+                """
+                SELECT c.id, c.name, c.definition, c.bounded_context, c.aliases_json, c.status, v.vec
+                FROM concept_vectors v JOIN concepts c ON c.id = v.concept_id
+                WHERE v.model = ? AND COALESCE(TRIM(c.definition), '') <> ''
+                """.trimIndent(),
+            ).use { st ->
+                st.setString(1, model)
+                st.executeQuery().use { rs ->
+                    buildList {
+                        while (rs.next()) add(rowToConcept(rs) to blobToVec(rs.getBytes("vec")))
+                    }
+                }
+            }
+        }.getOrDefault(emptyList())
+            .map { (c, v) -> c to cosine(queryVec, v) }
+            .filter { it.second > floor }
+            .sortedByDescending { it.second }
+            .take(topK)
+            .map { it.first }
+
+    /**
+     * Question-aware drill: reorder a concept's (already gated) doc sections by cosine
+     * of their stored vectors to the query. Sections without a stored vector keep
+     * their original (confidence) order, after the ranked ones.
+     */
+    fun rankDocsForQuery(docs: List<Artifact>, queryVec: FloatArray, model: String): List<Artifact> {
+        if (docs.size <= 1) return docs
+        val vecs = runCatching {
+            val placeholders = docs.joinToString(",") { "?" }
+            conn.prepareStatement(
+                "SELECT artifact_id, vec FROM section_vectors WHERE model = ? AND artifact_id IN ($placeholders)",
+            ).use { st ->
+                st.setString(1, model)
+                docs.forEachIndexed { i, d -> st.setString(i + 2, d.id) }
+                st.executeQuery().use { rs ->
+                    buildMap { while (rs.next()) put(rs.getString("artifact_id"), blobToVec(rs.getBytes("vec"))) }
+                }
+            }
+        }.getOrDefault(emptyMap())
+        if (vecs.isEmpty()) return docs
+        val (withVec, without) = docs.partition { it.id in vecs }
+        return withVec.sortedByDescending { cosine(queryVec, vecs.getValue(it.id)) } + without
+    }
+
+    /** All doc sections (id, title, body) — the embed corpus. */
+    fun docSections(): List<Artifact> =
+        conn.prepareStatement("SELECT id, kind, layer, source, ref, title, body FROM artifacts WHERE kind = 'doc'").use { st ->
+            st.executeQuery().use { rs -> buildList { while (rs.next()) add(rowToArtifact(rs)) } }
+        }
+
+    /** Resolved concepts (canonicalized: definition present) — the concept-card embed corpus. */
+    fun resolvedConcepts(): List<Concept> =
+        conn.prepareStatement(
+            "SELECT id, name, definition, bounded_context, aliases_json, status FROM concepts " +
+                "WHERE COALESCE(TRIM(definition), '') <> ''",
+        ).use { st ->
+            st.executeQuery().use { rs -> buildList { while (rs.next()) add(rowToConcept(rs)) } }
+        }
+
+    /**
+     * Line spans of code symbols (written by `ingest symbols` since spans landed) —
+     * artifact id → 1-based start..end. Symbols indexed before spans just miss here.
+     */
+    fun symbolSpans(ids: Collection<String>): Map<String, IntRange> {
+        if (ids.isEmpty()) return emptyMap()
+        val placeholders = ids.joinToString(",") { "?" }
+        return conn.prepareStatement("SELECT id, attrs_json FROM artifacts WHERE id IN ($placeholders)").use { st ->
+            ids.forEachIndexed { i, id -> st.setString(i + 1, id) }
+            st.executeQuery().use { rs ->
+                buildMap {
+                    while (rs.next()) {
+                        val attrs = rs.getString("attrs_json") ?: continue
+                        val start = SPAN_START.find(attrs)?.groupValues?.get(1)?.toIntOrNull() ?: continue
+                        val end = SPAN_END.find(attrs)?.groupValues?.get(1)?.toIntOrNull() ?: continue
+                        put(rs.getString("id"), start..end)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun vecToBlob(v: FloatArray): ByteArray {
+        val buf = java.nio.ByteBuffer.allocate(v.size * 4).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+        for (x in v) buf.putFloat(x)
+        return buf.array()
+    }
+
+    private fun blobToVec(b: ByteArray): FloatArray {
+        val buf = java.nio.ByteBuffer.wrap(b).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+        return FloatArray(b.size / 4) { buf.getFloat(it * 4) }
+    }
+
     /** Most common normalized terms across all mentions. */
     fun topTerms(limit: Int = 30): List<TermCount> =
         conn.prepareStatement(
@@ -798,6 +928,9 @@ class GraphStore(private val conn: Connection) {
             }
         }
 }
+
+private val SPAN_START = Regex("\"startLine\"\\s*:\\s*\"?(\\d+)")
+private val SPAN_END = Regex("\"endLine\"\\s*:\\s*\"?(\\d+)")
 
 private data class ConceptRow(
     val id: String,

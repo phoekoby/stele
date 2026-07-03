@@ -1,5 +1,6 @@
-package dev.stele.eval
+package dev.stele.resolver
 
+import dev.stele.core.embed.cosine
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

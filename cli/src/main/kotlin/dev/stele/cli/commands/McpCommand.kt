@@ -2,6 +2,8 @@ package dev.stele.cli.commands
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.options.option
+import dev.stele.cli.EmbedderFactory
+import dev.stele.cli.config.ConfigLoader
 import dev.stele.cli.dbFile
 import dev.stele.core.db.migrate
 import dev.stele.core.db.openDb
@@ -30,7 +32,13 @@ class McpCommand : CliktCommand(
         val usage = UsageLog(File(dbFileResolved.parentFile, "usage.jsonl"))
         // repo root = the dir that holds .stele, so the server can stat files for staleness.
         val repoRoot = dbFileResolved.parentFile?.parentFile
-        McpServer(GraphStore(conn), usage, repoRoot).serve(
+        // Semantic layer: same embedder config as `stele embed` wrote the vectors with.
+        // stele.yml is looked up from the repo root (the client's cwd is arbitrary).
+        val cfg = repoRoot?.let { root ->
+            File(root, "stele.yml").takeIf { it.isFile }?.let { runCatching { ConfigLoader.load(it) }.getOrNull() }
+        }
+        val embedder = EmbedderFactory.fromConfig(cfg?.llm)
+        McpServer(GraphStore(conn), usage, repoRoot, embedder).serve(
             System.`in`.bufferedReader(Charsets.UTF_8),
             OutputStreamWriter(System.out, Charsets.UTF_8),
         )

@@ -1,5 +1,7 @@
-package dev.stele.eval
+package dev.stele.resolver
 
+import dev.stele.core.embed.Embedder
+import dev.stele.core.embed.l2normalize
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -8,41 +10,13 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
-import kotlin.math.sqrt
-
-/** Turns text into a unit vector for the [VectorRagArm] baseline. */
-interface Embedder {
-    val name: String
-    /** Embed a document/chunk being indexed. */
-    fun embed(text: String): FloatArray
-    /** Embed a query. Asymmetric models (e.g. nomic) need distinct task prefixes. */
-    fun embedQuery(text: String): FloatArray = embed(text)
-}
-
-/** Cosine similarity of two equal-length vectors (both expected L2-normalized → just the dot). */
-fun cosine(a: FloatArray, b: FloatArray): Float {
-    var dot = 0f
-    val n = minOf(a.size, b.size)
-    for (i in 0 until n) dot += a[i] * b[i]
-    return dot
-}
-
-private fun l2normalize(v: FloatArray): FloatArray {
-    var sum = 0f
-    for (x in v) sum += x * x
-    val norm = sqrt(sum)
-    if (norm == 0f) return v
-    for (i in v.indices) v[i] /= norm
-    return v
-}
 
 /**
  * Offline default — the hashing trick: tokenize, hash each token into a fixed-width
  * bag-of-words vector, L2-normalize. No model, no network; deterministic and free.
- * It captures lexical overlap (not semantics), so it's a fair *floor* for vector RAG —
- * a real embedding model (see [OllamaEmbedder]) only does better, never worse.
+ * Captures lexical overlap only — the floor a real embedding model improves on.
  */
-class HashingEmbedder(private val dim: Int = 512) : Embedder {
+class HashingEmbedder(private val dim: Int = 4096) : Embedder {
     override val name = "hashing:$dim"
 
     override fun embed(text: String): FloatArray {
@@ -63,8 +37,7 @@ class HashingEmbedder(private val dim: Int = 512) : Embedder {
 
 /**
  * Real embeddings via Ollama (`/api/embeddings`) — e.g. `nomic-embed-text`. Same
- * local-first stance as the resolver's [dev.stele.resolver.OllamaClient]: OSS, offline,
- * no API key. Vectors are L2-normalized so [cosine] is a plain dot product.
+ * local-first stance as [OllamaClient]: OSS, offline, no API key.
  */
 class OllamaEmbedder(
     private val model: String = "nomic-embed-text",
@@ -77,7 +50,7 @@ class OllamaEmbedder(
     private val json = Json { ignoreUnknownKeys = true }
 
     // nomic is an asymmetric model: it was TRAINED with task prefixes, and skipping them
-    // measurably degrades retrieval — omitting this would strawman the vector baseline.
+    // measurably degrades retrieval quality.
     private val isNomic = model.contains("nomic")
 
     override fun embed(text: String): FloatArray =

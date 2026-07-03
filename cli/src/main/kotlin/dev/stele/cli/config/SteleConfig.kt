@@ -20,6 +20,10 @@ data class LlmConfig(
     // For OpenAI-compatible providers (deepseek/openai/any): the API root and which env var holds the key.
     val baseUrl: String? = null,
     val apiKeyEnv: String? = null,
+    // Semantic layer (concept resolution + question-aware drill). `hashing` is the
+    // offline zero-dependency floor; `ollama` + nomic-embed-text is the measured 90%.
+    val embedProvider: String = "hashing",
+    val embedModel: String = "nomic-embed-text",
 )
 
 @Serializable

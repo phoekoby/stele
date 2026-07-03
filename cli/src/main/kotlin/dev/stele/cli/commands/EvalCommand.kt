@@ -9,18 +9,18 @@ import dev.stele.cli.LlmFactory
 import dev.stele.cli.requireDb
 import dev.stele.core.db.openDb
 import dev.stele.core.store.GraphStore
+import dev.stele.core.embed.Embedder
 import dev.stele.eval.AgenticArm
 import dev.stele.eval.Answerer
-import dev.stele.eval.Embedder
 import dev.stele.eval.EvalRunner
 import dev.stele.eval.GoldenLoader
-import dev.stele.eval.HashingEmbedder
 import dev.stele.eval.Judge
-import dev.stele.eval.OllamaEmbedder
 import dev.stele.eval.RetrievalArm
 import dev.stele.eval.SteleArm
 import dev.stele.eval.VectorRagArm
 import dev.stele.eval.renderReport
+import dev.stele.resolver.HashingEmbedder
+import dev.stele.resolver.OllamaEmbedder
 import java.io.File
 
 /**
