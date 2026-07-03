@@ -18,15 +18,17 @@ strict rubric; the same embedding model (nomic, task-prefixed) for every arm tha
 
 | retrieval arm | concept-hit | artifact-recall | ~tokens | answer score |
 |---|---|---|---|---|
-| **Stele — semantic resolve + question-aware drill** | **90%** | **85.4%** | **2219** | **3.68 / 5** |
-| Stele — lexical resolve (baseline self) | 60% | 54.2% | 2322 | 3.41 / 5 |
-| naive vector RAG (chunk + embed + top-k) | —¹ | 29.2% | 2412 | 3.45 / 5 |
+| **Stele — semantic resolve + question-aware drill** | **86.7%** | **89.6%** | **1939** | 3.50 / 5 |
+| Stele — lexical resolve (baseline self) | 53.3% | 62.5% | 1950 | 3.09 / 5 |
+| naive vector RAG (chunk + embed + top-k) | —¹ | 29.2% | 2412 | 3.50 / 5 |
 
-The chain holds end-to-end: right concept (90%) → right artifacts (**2.9×** the recall of
-vector RAG) → fewer tokens → better answers from a 3B model (paired wins 10–6, 6 ties)².
-Vector RAG's failure is **structural, not embedding quality**: strengthening its embedder
-(proper nomic task prefixes) did not move it — a 50-line chunk is the wrong retrieval unit
-for a question about a concept that spans docs + code + rules.
+Retrieval: right concept (87%) → right artifacts (**3.1×** the recall of vector RAG) at
+**20% fewer tokens**. Vector RAG's failure is **structural, not embedding quality**:
+strengthening its embedder (proper nomic task prefixes) did not move it — a 50-line chunk
+is the wrong retrieval unit for a question about a concept that spans docs + code + rules.
+Answer quality from the 3B model is **tied at this sample size**² (two runs bracketed it:
+paired wins 10–6–6 then 6–7–9) — resolving it needs K≥3 samples per cell, which is the
+next eval stage; what is already resolved is *equal answers at 3× recall and fewer tokens*.
 
 **2. Rule-compliance of a coding agent** — 41 trap tasks on 2 repos (each task seeded from a
 real product rule), deterministic regex/static checkers, no LLM judge:
@@ -50,10 +52,11 @@ independent measurements of the same claim.
 
 **Honesty box.** Every eval iteration fixed a methodology bug *in the baseline's favour*
 (un-strawmanned the embedder; kept the run where our pointer-only context *lost*; a judge
-rubric that stopped rewarding refusals). Remaining limits: the Q&A axis is N=22 judged
-questions, single-sample (paired sign test p≈0.45 — direction, not significance yet); one
-repo; an 8B judge is noisy; ~8% of the ingested "product docs" turned out to be the repo's
-own AI-agent plans — a typed agent layer is planned, numbers will be re-run.
+rubric that stopped rewarding refusals; agent-instruction files that had been silently
+ingested as product docs are now a typed AGENT layer, and doc-heading alias pollution is
+gated — numbers above are from the cleaned graph). Remaining limits: the Q&A axis is N=22
+judged questions, single-sample per run — answer-score deltas are inside judge noise (an
+8B judge), so only the retrieval-axis claims are settled; one repo so far.
 
 ¹ vector RAG never names a concept — compare it on recall and score.
 ² judged subset: the 22 questions with reference answers.
