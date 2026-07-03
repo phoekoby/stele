@@ -14,19 +14,30 @@ sets, per-run numbers and the iteration history live in [`eval/`](eval/README.md
 **1. Support Q&A with a small model** — 30 real user questions taken from
 [Documenso](https://github.com/documenso/documenso)'s GitHub Discussions; the answering model
 is held constant (**llama3.2:3b**), only the retrieval changes; judge llama3.1:8b under a
-strict rubric; the same embedding model (nomic, task-prefixed) for every arm that embeds:
+strict rubric, **K=3 samples per question** (± is a 95% CI); the same embedding model
+(nomic, task-prefixed) for every arm that embeds:
 
-| retrieval arm | concept-hit | artifact-recall | ~tokens | answer score |
+| retrieval arm | concept-hit | artifact-recall | ~tokens | answer score (K=3) |
 |---|---|---|---|---|
-| **Stele — semantic resolve + question-aware drill** | **90%** | **85.4%** | **2219** | **3.68 / 5** |
-| Stele — lexical resolve (baseline self) | 60% | 54.2% | 2322 | 3.41 / 5 |
-| naive vector RAG (chunk + embed + top-k) | —¹ | 29.2% | 2412 | 3.45 / 5 |
+| **Stele — semantic resolve + drill** | **86.7%** | **87.5%** | 2395 | 3.41 ±0.20 |
+| Stele — lexical resolve (baseline self) | 53.3% | 62.5% | 1950 | 3.08 ±0.25 |
+| naive vector RAG (chunk + embed + top-k) | —¹ | 29.2% | 2412 | 3.54 ±0.17 |
+| agentic grep (same 3B drives a GREP/READ loop) | —¹ | 0% | **6601** | **2.80 ±0.18** |
 
-The chain holds end-to-end: right concept (90%) → right artifacts (**2.9×** the recall of
-vector RAG) → fewer tokens → better answers from a 3B model (paired wins 10–6, 6 ties)².
-Vector RAG's failure is **structural, not embedding quality**: strengthening its embedder
-(proper nomic task prefixes) did not move it — a 50-line chunk is the wrong retrieval unit
-for a question about a concept that spans docs + code + rules.
+The verdict, per axis:
+- **Retrieval: settled, 3× the artifact recall** of vector RAG at equal tokens — the answer
+  can *cite where it came from* 87% of the time vs 29%. Vector RAG's failure here is
+  structural, not embedding quality: strengthening its embedder (proper nomic task
+  prefixes) did not move it — a 50-line chunk is the wrong retrieval unit for a concept
+  that spans docs + code + rules.
+- **Answers: statistical parity with vector RAG** (paired 11W/14L/4T, sign p=0.69) — said
+  plainly: on single-doc "how does X work" questions, raw chunks answer as well as the
+  graph. Parity was reached only after a measured lesson: the graph found better material
+  but *served it too thin* (700-char bodies lost to raw chunks, p=0.035); matching the
+  content density closed the gap.
+- **Agentic search on a small model: significantly worst and 2.7× the cost** — 2.80 ±0.18,
+  p=0.015 vs the graph, p=0.002 vs vector, 6.6k tokens/question. A 3B model cannot afford
+  to explore; curated context is how a small model competes.
 
 **2. Rule-compliance of a coding agent** — 41 trap tasks on 2 repos (each task seeded from a
 real product rule), deterministic regex/static checkers, no LLM judge:
@@ -49,14 +60,16 @@ independent measurements of the same claim.
   code map; things a small model can actually answer from.
 
 **Honesty box.** Every eval iteration fixed a methodology bug *in the baseline's favour*
-(un-strawmanned the embedder; kept the run where our pointer-only context *lost*; a judge
-rubric that stopped rewarding refusals). Remaining limits: the Q&A axis is N=22 judged
-questions, single-sample (paired sign test p≈0.45 — direction, not significance yet); one
-repo; an 8B judge is noisy; ~8% of the ingested "product docs" turned out to be the repo's
-own AI-agent plans — a typed agent layer is planned, numbers will be re-run.
+(un-strawmanned the embedder; kept and published the runs where we *lost* — pointer-only
+context, then under-dense context; a judge rubric that stopped rewarding refusals; agent
+instructions that had been silently ingested as product docs are now a typed AGENT layer).
+We do not claim answer superiority over vector RAG — the measured claim is *parity at 3×
+the citation-grounding, and a significant win over agentic search at a third of its cost*.
+Where the graph should pull ahead — cross-artifact questions, rule/mismatch checks,
+multi-repo routing — is exactly the rule-compliance axis below plus planned next stages.
+Remaining limits: one repo; 29 judged questions; an 8B judge; K=3.
 
-¹ vector RAG never names a concept — compare it on recall and score.
-² judged subset: the 22 questions with reference answers.
+¹ neither vector RAG nor agentic grep names concepts — compare them on recall/score/cost.
 
 ---
 

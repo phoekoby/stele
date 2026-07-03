@@ -2,12 +2,15 @@ package dev.stele.cli
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.subcommands
+import dev.stele.cli.commands.AskCommand
 import dev.stele.cli.commands.BuildOntologyCommand
 import dev.stele.cli.commands.ConceptCommand
 import dev.stele.cli.commands.DedupeCommand
+import dev.stele.cli.commands.EmbedCommand
 import dev.stele.cli.commands.EvalCommand
 import dev.stele.cli.commands.ExplainCommand
 import dev.stele.cli.commands.GraphCommand
+import dev.stele.cli.commands.IngestAgentsCommand
 import dev.stele.cli.commands.IngestAstIndexCommand
 import dev.stele.cli.commands.IngestCodeCommand
 import dev.stele.cli.commands.IngestCodeGraphCommand
@@ -41,15 +44,17 @@ fun main(args: Array<String>) =
             SyncCommand(),
             StatsCommand(),
             IngestCommand().subcommands(
-                IngestCodeCommand(), IngestSymbolsCommand(), IngestDocsCommand(), IngestWebCommand(),
-                IngestCodeGraphCommand(), IngestAstIndexCommand(),
+                IngestCodeCommand(), IngestSymbolsCommand(), IngestDocsCommand(), IngestAgentsCommand(),
+                IngestWebCommand(), IngestCodeGraphCommand(), IngestAstIndexCommand(),
             ),
             BuildOntologyCommand(),
             RefineRulesCommand(),
             DedupeCommand(),
+            EmbedCommand(),
             ReviewCommand(),
             TermsCommand(),
             SearchCommand(),
+            AskCommand(),
             ConceptCommand(),
             ExplainCommand(),
             GraphCommand(),

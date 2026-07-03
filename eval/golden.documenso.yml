@@ -20,6 +20,7 @@ questions:
     question: "We sent a document to the wrong person. What happens to signing statuses if we update a recipient on a pending document?"
     concepts: [Recipient, Document]
     artifacts: ["packages/lib/server-only/recipient"]
+    answer: "A recipient can be updated only while they haven't acted — the code rejects modifying a recipient who has already interacted with the document, and a completed envelope can't be edited at all. Other recipients' signing statuses are unaffected."
     tags: [how]
 
   - id: d03 # discussion #2470, #2042
@@ -79,6 +80,7 @@ questions:
     question: "How do I control text field formatting in a template — alignment, size, multi-line?"
     concepts: [Field]
     artifacts: ["packages/lib/types/field-meta.ts"]
+    answer: "Text fields carry advanced settings in their field meta: font size (8–96), text alignment, and a character limit — configured per field in the editor's advanced field options."
     tags: [how]
 
   - id: d12
@@ -92,6 +94,7 @@ questions:
     question: "Can field positions be set dynamically with text tags or placeholders instead of dragging them?"
     concepts: [Field]
     artifacts: ["apps/docs/content/docs"]
+    answer: "Yes — placeholder-based field positioning: put placeholder text tags in the document and the API positions fields where they occur, instead of manual coordinates."
     tags: [how]
 
   - id: d14 # discussion #2025-era docx support
@@ -126,6 +129,7 @@ questions:
     question: "Which per-document authentication options can be required from a signer before they can sign?"
     concepts: [DocumentAuthentication]
     artifacts: ["packages/lib/types/document-auth.ts"]
+    answer: "Per-document auth methods: ACCOUNT (signed-in account), PASSKEY, TWO_FACTOR_AUTH, PASSWORD, or EXPLICIT_NONE — set as access/action auth requirements on the document or recipient."
     tags: [how, rules]
 
   # --- API & integrations -----------------------------------------------------------
@@ -146,6 +150,7 @@ questions:
   - id: d21 # discussion #2191
     question: "Using API v2, where do I get the signing URL for each recipient after creating a document?"
     concepts: [Recipient]
+    answer: "The distribute/create response includes recipients[], each with a signingUrl — iterate the recipients array and use each recipient's signingUrl."
     tags: [how]
 
   - id: d22
@@ -167,6 +172,7 @@ questions:
     question: "The app says 3 of 5 documents used but I don't have any documents in my account. How are document limits counted?"
     concepts: [PlanLimits, Billing]
     artifacts: ["packages/ee/server-only/limits"]
+    answer: "The free plan allows 5 documents per month, counted by documents CREATED since the start of the current month — deleting a document does not free the quota; it resets monthly."
     tags: [how, rules]
 
   - id: d25 # discussion #2534
@@ -188,6 +194,7 @@ questions:
     question: "I customised our branding, but emails still show the Documenso logo and links. Is email branding supported?"
     concepts: [Branding, Email]
     artifacts: ["packages/lib/server-only/branding"]
+    answer: "Partially — your logo appears on signing pages, and the Brand Details text appears at the bottom of email notifications; some Documenso branding remains in emails on the community edition."
     tags: [how]
 
   - id: d28

@@ -55,7 +55,7 @@ private val GENERIC_DIRS = setOf(
  * This is the deterministic cousin of GitNexus/ast-index: same definition nodes,
  * a simpler folder-based clustering instead of call-graph community detection.
  */
-fun ingestSymbols(store: GraphStore, rootArg: String): SymbolIngestResult {
+fun ingestSymbols(store: GraphStore, rootArg: String, refPrefix: String = ""): SymbolIngestResult {
     val root = File(rootArg).absoluteFile.normalize()
     val rootPath = root.toPath()
     val parser = TSParser()
@@ -73,7 +73,7 @@ fun ingestSymbols(store: GraphStore, rootArg: String): SymbolIngestResult {
     for (file in walk(root)) {
         val langKey = EXT_TO_LANG["." + file.extension] ?: continue
         val language = langCache.getOrPut(langKey) { loadLanguage(langKey, parser, skipped) } ?: continue
-        val ref = rootPath.relativize(file.toPath()).toString().replace('\\', '/')
+        val ref = refPrefix + rootPath.relativize(file.toPath()).toString().replace('\\', '/')
         seen.add(ref)
         val mtime = file.lastModified()
         if (prevMtimes[ref] == mtime) continue // unchanged — keep its existing symbols
@@ -106,7 +106,14 @@ fun ingestSymbols(store: GraphStore, rootArg: String): SymbolIngestResult {
                     source = "code",
                     ref = symbolRef,
                     title = name,
-                    attrs = mapOf("symbolKind" to node.type, "via" to "treesitter"),
+                    attrs = mapOf(
+                        "symbolKind" to node.type,
+                        "via" to "treesitter",
+                        // 1-based line span — lets serving pull the BODY of a symbol
+                        // (`stele ask` / context drill), not just its path.
+                        "startLine" to (node.startPoint.row + 1).toString(),
+                        "endLine" to (node.endPoint.row + 1).toString(),
+                    ),
                 )
                 symbolRefs.add(symbolRef)
 
@@ -128,8 +135,13 @@ fun ingestSymbols(store: GraphStore, rootArg: String): SymbolIngestResult {
         }
     }
 
-    // Files indexed before but gone now → drop their now-stale symbols.
+    // Files indexed before but gone now → drop their now-stale symbols. Reap ONLY what
+    // this ingest is responsible for: refs under OUR prefix (multi-repo graphs hold
+    // other repos' files) with an extension this walker indexes (source_files also
+    // tracks agent .md files recorded by `ingest agents` — not ours to delete).
     for (gone in prevMtimes.keys - seen) {
+        if (!gone.startsWith(refPrefix)) continue
+        if (EXT_TO_LANG["." + gone.substringAfterLast('.')] == null) continue
         store.deleteFileArtifacts(gone)
         store.deleteSourceFile(gone)
     }

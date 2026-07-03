@@ -136,3 +136,54 @@ Findings (each earned by fixing a real methodological bug — keep the order):
 
 Next: port semantic resolve + question-aware drill into MCP serving (`concept_context`),
 `stele ask` (two-sided answer: docs-say vs code-does), agentic-grep arm, K≥3 sampling.
+
+### K=3 update (Stage C) — the answer axis, decided
+
+`--samples 3`, per-question mean scores, exact sign tests (all four arms, cleaned graph):
+
+```
+arm         concept-hit  artifact-recall  ~tokens  answer (K=3)
+stele-sem      86.7%        87.5%          2395    3.41 ±0.20
+stele          53.3%        62.5%          1950    3.08 ±0.25
+vector           —          29.2%          2412    3.54 ±0.17
+agentic          —           0%            6601    2.80 ±0.18
+
+stele-sem vs vector   11W/14L/4T  p=0.69   (parity — after equalizing content density)
+stele     vs vector    6W/17L/6T  p=0.035  (thin 700-char serving LOSES to raw chunks)
+stele-sem vs agentic  19W/6L/4T   p=0.015  (graph beats agentic significantly)
+vector    vs agentic  22W/5L/2T   p=0.002
+```
+
+Three lessons, in the order the data forced them:
+1. **Serving density is a first-class variable.** The graph found better material (87.5%
+   recall) but served 700-char snippets — and lost the answer axis to raw 2.4k chunks
+   (p=0.035). Matching the token budget closed the gap to parity (p=0.69).
+2. **Answer parity, not superiority, vs vector RAG** on single-doc how-questions — the
+   honest claim. The graph's justified edge on this axis is *citation grounding* (the
+   right artifacts are in context 87.5% vs 29.2%).
+3. **Agentic grep on a 3B is the significantly worst option at 2.7× the cost** — the
+   strongest evidence yet for "small models need curated context, not a search loop".
+
+## Cross-repo (Stage D) — one graph over two real repos
+
+Workspace layout: `documenso/` (the product) + `sdk-typescript/` (its official SDK) feed ONE
+graph; refs are repo-prefixed (`documenso/packages/…`, `sdk-typescript/src/…`). 10 questions
+(`golden.workspace.yml`) whose gold artifacts require BOTH repos — recall = cross-repo coverage.
+
+```
+arm         concept-hit  artifact-recall  ~tokens  latency
+stele-sem      80%           75%           2122     0.3s
+stele          70%           45%           2255     16ms
+vector           —           50%*          2244     157s (26-min two-repo index on q1)
+```
+*vector's 50% is flattered: bare-repo gold prefixes match any chunk from that repo.
+
+What the graph does here that chunks structurally can't: one question ("how do I create a
+document from a template with the TypeScript SDK?") resolves to concepts and returns the
+core repo's SDK guide, the SDK's README, and the SDK code map in one slice — because both
+repos attach to the same concept spine.
+
+Lesson (kept honestly): **alias errors compound.** One wrong seed alias in a canonicalization
+verdict ("SDK" on the Embedding concept) attracted more wrong aliases at doc-ingest time
+("Using the TypeScript SDK" → Embedding) and skewed resolution until cleaned. Concept-card
+quality is a first-class input; alias provenance tracking is on the roadmap.

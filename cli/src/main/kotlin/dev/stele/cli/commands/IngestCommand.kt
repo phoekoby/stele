@@ -8,8 +8,10 @@ import dev.stele.cli.requireDb
 import dev.stele.connectors.codegraph.AstIndexSource
 import dev.stele.connectors.codegraph.JsonCodeGraphSource
 import dev.stele.connectors.codegraph.ingestCodeGraph
+import dev.stele.connectors.docs.ingestAgents
 import dev.stele.connectors.docs.ingestDocs
 import dev.stele.connectors.docs.ingestWeb
+import dev.stele.core.connector.refPrefix
 import dev.stele.core.db.migrate
 import dev.stele.core.db.openDb
 import dev.stele.core.store.GraphStore
@@ -49,7 +51,7 @@ class IngestSymbolsCommand : CliktCommand(
     override fun run() {
         val conn = openDb(requireDb().path)
         migrate(conn) // ensure source_files exists on graphs created before incremental re-index
-        val res = ingestSymbols(GraphStore(conn), path)
+        val res = ingestSymbols(GraphStore(conn), path, refPrefix(path))
         conn.close()
         echo(
             "✓ symbols: ${res.changed}/${res.files} files re-parsed → ${res.symbols} symbols, " +
@@ -69,12 +71,27 @@ class IngestDocsCommand : CliktCommand(
 
     override fun run() {
         val conn = openDb(requireDb().path)
-        val res = ingestDocs(GraphStore(conn), path)
+        val res = ingestDocs(GraphStore(conn), path, refPrefix(path))
         conn.close()
         echo(
             "✓ docs: ${res.docs} docs, ${res.sections} sections, ${res.links} describes, " +
                 "${res.aliasesAdded} aliases, ${res.relations} concept↔concept, ${res.rules} rules",
         )
+    }
+}
+
+class IngestAgentsCommand : CliktCommand(
+    name = "agents",
+    help = "Ingest agent instructions (.agents/.claude/.opencode, CLAUDE.md) as a typed AGENT layer",
+) {
+    private val path by argument(name = "path", help = "Repo root to scan")
+
+    override fun run() {
+        val conn = openDb(requireDb().path)
+        migrate(conn) // agent files record mtimes into source_files
+        val res = ingestAgents(GraphStore(conn), path, refPrefix(path))
+        conn.close()
+        echo("✓ agents: ${res.docs} files, ${res.sections} sections, ${res.links} describes (no ontology enrichment)")
     }
 }
 

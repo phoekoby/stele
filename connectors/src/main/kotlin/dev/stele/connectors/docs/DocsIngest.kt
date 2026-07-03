@@ -36,8 +36,15 @@ private val LEAD_NUM = Regex("^\\s*\\d+[.)]\\s*")
 private val DOC_EXT = setOf("md", "markdown", "mdx")
 private val IGNORE = setOf(
     "node_modules", ".git", ".stele", "dist", "build", "target",
-    "vendor", ".next", "out", ".gradle", ".claude",
+    "vendor", ".next", "out", ".gradle",
+    // Agent-instruction dirs are a SEPARATE layer (`ingest agents`), not product docs:
+    // their headings ("Step 5: Update auth", "SOCKS5 with auth") polluted concept
+    // aliases when ingested as product language.
+    ".claude", ".agents", ".opencode", ".cursor",
 )
+
+// Root-level agent instruction files — same reasoning as the dirs above.
+private val AGENT_FILES = setOf("claude.md", "agents.md", "opencode.md", ".windsurfrules")
 
 // Section titles that aren't product terms — never promoted to aliases.
 private val GENERIC_HEADINGS = setOf(
@@ -61,14 +68,47 @@ private class Term(val regex: Regex, val conceptId: String)
 /** One source document feeding the linker: a stable ref, a display name, and markdown-ish content (# headings). */
 private data class RawDoc(val ref: String, val name: String, val content: String)
 
-fun ingestDocs(store: GraphStore, rootArg: String): DocsIngestResult {
+fun ingestDocs(store: GraphStore, rootArg: String, refPrefix: String = ""): DocsIngestResult {
     val root = File(rootArg).absoluteFile.normalize()
     val rootPath = root.toPath()
     val raws = walkDocs(root).mapNotNull { file ->
         val content = runCatching { file.readText() }.getOrNull() ?: return@mapNotNull null
-        RawDoc(rootPath.relativize(file.toPath()).toString().replace('\\', '/'), file.name, content)
+        RawDoc(refPrefix + rootPath.relativize(file.toPath()).toString().replace('\\', '/'), file.name, content)
     }.toList()
     return linkDocs(store, raws, "docs")
+}
+
+// The agent layer: skills, plans, CLAUDE.md/AGENTS.md, .cursor rules.
+private val AGENT_DIRS = listOf(".agents", ".claude", ".opencode", ".cursor")
+private val AGENT_EXT = DOC_EXT + "mdc" // .cursor rules use .mdc
+
+/**
+ * The AGENT layer: instructions repos already carry for AI agents (skills, plans,
+ * CLAUDE.md/AGENTS.md, .cursor rules). They link to concepts like docs do — so a
+ * concept knows which playbooks touch it, and staleness can flag rotting
+ * instructions — but they are NOT product language: no alias enrichment, no
+ * concept↔concept relations, no product rules are derived from them.
+ */
+fun ingestAgents(store: GraphStore, rootArg: String, refPrefix: String = ""): DocsIngestResult {
+    val root = File(rootArg).absoluteFile.normalize()
+    val rootPath = root.toPath()
+    val files = buildList {
+        for (d in AGENT_DIRS) {
+            val dir = File(root, d)
+            if (dir.isDirectory) addAll(dir.walkTopDown().filter { it.isFile && it.extension.lowercase() in AGENT_EXT })
+        }
+        for (f in root.listFiles().orEmpty()) {
+            if (f.isFile && f.name.lowercase() in AGENT_FILES) add(f)
+        }
+    }
+    val raws = files.mapNotNull { file ->
+        val content = runCatching { file.readText() }.getOrNull() ?: return@mapNotNull null
+        val ref = refPrefix + rootPath.relativize(file.toPath()).toString().replace('\\', '/')
+        // mtime recorded → `stats`/`isStale` flag agent instructions whose file changed.
+        store.recordFile(ref, file.lastModified())
+        RawDoc(ref, file.name, content)
+    }
+    return linkDocs(store, raws, "agents", layer = Layer.AGENT, enrich = false)
 }
 
 /**
@@ -81,7 +121,14 @@ fun ingestWeb(store: GraphStore, urls: List<String>): DocsIngestResult {
     return linkDocs(store, raws, "web")
 }
 
-private fun linkDocs(store: GraphStore, raws: List<RawDoc>, source: String): DocsIngestResult {
+private fun linkDocs(
+    store: GraphStore,
+    raws: List<RawDoc>,
+    source: String,
+    layer: Layer = Layer.PRODUCT,
+    /** Product docs enrich the ontology (aliases/relations/rules); agent docs only LINK. */
+    enrich: Boolean = true,
+): DocsIngestResult {
     val vocab = buildVocabulary(store.conceptVocabulary())
     if (vocab.isEmpty()) return DocsIngestResult(0, 0, 0, 0, 0, 0)
 
@@ -108,7 +155,7 @@ private fun linkDocs(store: GraphStore, raws: List<RawDoc>, source: String): Doc
             val anchor = if (heading == INTRO) "intro-$idx" else slug(heading)
             val docId = store.addArtifact(
                 kind = ArtifactKind.DOC,
-                layer = Layer.PRODUCT,
+                layer = layer,
                 source = source,
                 ref = "${raw.ref}#$anchor",
                 title = title,
@@ -130,10 +177,11 @@ private fun linkDocs(store: GraphStore, raws: List<RawDoc>, source: String): Doc
                 links++
                 // A heading that literally contains the concept term is a product
                 // phrasing of it (e.g. "Live session" -> Authentication) → alias.
-                if (strong) aliasFromHeading(heading)?.let {
+                if (enrich && strong) aliasFromHeading(heading)?.let {
                     aliasCandidates.getOrPut(conceptId) { LinkedHashSet() }.add(it)
                 }
             }
+            if (!enrich) continue
 
             // concept<->concept: co-description in a section is a relationship signal.
             val ids = hits.keys.toList()
@@ -171,7 +219,9 @@ private fun linkDocs(store: GraphStore, raws: List<RawDoc>, source: String): Doc
     }
 
     var aliasesAdded = 0
-    for ((conceptId, headings) in aliasCandidates) aliasesAdded += store.addAliases(conceptId, headings)
+    // Cap per concept per run: past ~8 doc phrasings the extras are noise that dilutes
+    // the concept card and bloats lexical search.
+    for ((conceptId, headings) in aliasCandidates) aliasesAdded += store.addAliases(conceptId, headings.take(8))
 
     var relations = 0
     for ((pair, count) in cooccurrence) {
@@ -211,13 +261,31 @@ private fun rulesIn(body: String): List<String> =
         .distinct()
         .take(3)
 
-/** Promote a section heading to an alias, unless it's a generic section title. */
-private fun aliasFromHeading(heading: String): String? {
+// Instructional headings ("Step 5: …", "Phase 3 …", "Verify the login") are steps,
+// not product phrasings of a concept.
+private val STEP_PREFIX = Regex("^(step|phase|stage|part|session|workflow|option|шаг|этап)\\b\\s*\\d*", RegexOption.IGNORE_CASE)
+private val LEAD_BARE_NUM = Regex("^\\s*\\d+\\s+")
+private val IMPERATIVE_LEAD = Regex(
+    "^(add|create|open|click|run|set|enable|disable|configure|update|verify|check|test|navigate|select|" +
+        "enter|fill|upload|download|save|delete|remove|install|start|stop|use|choose|generate|import|export)\\b",
+    RegexOption.IGNORE_CASE,
+)
+
+/**
+ * Promote a section heading to an alias — only if it plausibly IS a product term:
+ * a short noun phrase, not a numbered step, not an imperative instruction. Doc-heading
+ * aliases measurably poisoned lexical resolution before this gate.
+ */
+internal fun aliasFromHeading(heading: String): String? {
+    // A bare leading number ("4 Auth endpoint rate limiting") is a plan step, not a term.
+    if (LEAD_BARE_NUM.containsMatchIn(heading)) return null
     val h = heading.replace(LEAD_NUM, "").trim().trimEnd(':').trim()
-    if (h.length > 50 || h.isBlank()) return null
-    if (h.split(Regex("\\s+")).size > 6) return null
+    if (h.length > 32 || h.isBlank()) return null
+    if (h.split(Regex("\\s+")).size > 4) return null
     if (h.lowercase() in GENERIC_HEADINGS) return null
-    if (h.any { it == '`' || it == '|' || it == '#' || it == '(' }) return null
+    if (h.any { it == '`' || it == '|' || it == '#' || it == '(' || it == ':' }) return null
+    if (STEP_PREFIX.containsMatchIn(h)) return null
+    if (IMPERATIVE_LEAD.containsMatchIn(h)) return null
     return h
 }
 
@@ -250,7 +318,7 @@ private fun splitSections(content: String): List<Pair<String, String>> {
 private fun walkDocs(dir: File): Sequence<File> = sequence {
     val entries = dir.listFiles() ?: return@sequence
     for (entry in entries) {
-        if (entry.name in IGNORE) continue
+        if (entry.name in IGNORE || entry.name.lowercase() in AGENT_FILES) continue
         if (entry.isDirectory) {
             yieldAll(walkDocs(entry))
         } else if (entry.isFile && entry.extension.lowercase() in DOC_EXT && entry.length() <= 2_000_000) {

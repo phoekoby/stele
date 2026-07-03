@@ -1,0 +1,70 @@
+# Cross-repo golden set — a WORKSPACE graph over two real repos:
+#   documenso/       (the product: github.com/documenso/documenso)
+#   sdk-typescript/  (its official SDK: github.com/documenso/sdk-typescript)
+# Layout: workspace/.stele + stele.yml with per-repo sources; refs are repo-prefixed.
+#
+# This measures the multi-repo thesis: a support question names a CONCEPT, and the
+# answer spans repos (SDK surface + core implementation). Gold artifacts deliberately
+# list one path per repo — artifact-recall = cross-repo coverage. Answer axis is
+# settled (parity) — this set is retrieval-focused; run without --answer.
+name: documenso-workspace-eval
+questions:
+  - id: w01
+    question: "How do I create a document from a template using the TypeScript SDK, and where does the core implement it?"
+    concepts: [Template, TypeScriptSDK]
+    artifacts: ["sdk-typescript", "documenso/packages/lib/server-only/template"]
+    tags: [cross-repo, how]
+
+  - id: w02
+    question: "What credential do I pass to authenticate the TypeScript SDK, and where do I create it?"
+    concepts: [ApiToken, TypeScriptSDK]
+    artifacts: ["sdk-typescript", "documenso/packages/lib/server-only/public-api"]
+    tags: [cross-repo, how]
+
+  - id: w03
+    question: "Does the SDK support embedded signing presign tokens, and which core router verifies them?"
+    concepts: [Embedding]
+    artifacts: ["sdk-typescript", "documenso/packages/trpc/server/embedding-router"]
+    tags: [cross-repo, how]
+
+  - id: w04
+    question: "The SDK ships an MCP server — what is it and how does an AI agent use it?"
+    concepts: [MCPServer]
+    artifacts: ["sdk-typescript/src/mcp-server"]
+    tags: [where]
+
+  - id: w05
+    question: "How do I download a completed document through the SDK, and what must be true server-side before download works?"
+    concepts: [Document, TypeScriptSDK]
+    artifacts: ["sdk-typescript", "documenso/packages/lib/server-only/document"]
+    tags: [cross-repo, how, rules]
+
+  - id: w06
+    question: "Can I manage webhooks through the SDK, and which core package delivers webhook events?"
+    concepts: [Webhook]
+    artifacts: ["sdk-typescript", "documenso/packages/lib/server-only/webhooks"]
+    tags: [cross-repo, where]
+
+  - id: w07
+    question: "Where are direct link templates exposed in the SDK, and where does the core resolve a direct link token?"
+    concepts: [Template]
+    artifacts: ["sdk-typescript", "documenso/packages/lib/server-only/template"]
+    tags: [cross-repo, where]
+
+  - id: w08
+    question: "How are envelopes represented in the SDK versus the core data model?"
+    concepts: [Envelope]
+    artifacts: ["sdk-typescript", "documenso/packages/lib/types/envelope.ts"]
+    tags: [cross-repo, how]
+
+  - id: w09
+    question: "Which SDK call returns a recipient's signing URL, and which core service issues it?"
+    concepts: [Recipient]
+    artifacts: ["sdk-typescript", "documenso/packages/lib/server-only/recipient"]
+    tags: [cross-repo, how]
+
+  - id: w10
+    question: "What field types can I set when creating fields via the SDK, and where does the core validate field meta?"
+    concepts: [Field]
+    artifacts: ["sdk-typescript", "documenso/packages/lib/types/field-meta.ts"]
+    tags: [cross-repo, how]

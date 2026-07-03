@@ -76,6 +76,11 @@ class SyncCommand : CliktCommand(
             echo("review: confirmed $n proposed edges (confidence ≥ $it)")
         }
 
+        // Semantic layer last — concepts are canonical and doc sections exist by now.
+        val embedder = dev.stele.cli.EmbedderFactory.fromConfig(cfg.llm)
+        val (ec, es) = embedAll(store, embedder) { echo(it) }
+        echo("embed [${embedder.name}]: $ec concept cards, $es doc sections")
+
         conn.close()
         echo("✓ sync complete")
     }

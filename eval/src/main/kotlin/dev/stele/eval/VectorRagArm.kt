@@ -1,5 +1,8 @@
 package dev.stele.eval
 
+import dev.stele.core.embed.Embedder
+import dev.stele.core.embed.cosine
+import dev.stele.resolver.HashingEmbedder
 import java.io.File
 
 /**
@@ -74,21 +77,9 @@ class VectorRagArm(
         return chunks
     }
 
-    private fun walk(dir: File): Sequence<File> = dir.walkTopDown()
-        .onEnter { it.name !in IGNORE_DIRS }
-        .filter { it.isFile && it.length() in 1..maxFileBytes && it.extension.lowercase() in TEXT_EXT }
+    private fun walk(dir: File): Sequence<File> = RepoWalk.walk(dir, maxFileBytes)
 
     companion object {
         private const val MAX_CHUNK_CHARS = 2400
-
-        private val IGNORE_DIRS = setOf(
-            "node_modules", ".git", "dist", "build", ".stele", ".next", "out", "target",
-            "vendor", "__pycache__", ".venv", ".idea", ".gradle",
-        )
-        private val TEXT_EXT = setOf(
-            "kt", "kts", "java", "go", "ts", "tsx", "js", "jsx", "py", "rb", "rs", "c", "cc",
-            "cpp", "h", "hpp", "cs", "swift", "dart", "scala", "php", "sql", "md", "mdx",
-            "txt", "yml", "yaml", "json", "toml", "proto", "gradle",
-        )
     }
 }

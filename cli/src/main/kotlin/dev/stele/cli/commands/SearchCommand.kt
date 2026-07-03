@@ -5,6 +5,8 @@ import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.int
+import dev.stele.cli.EmbedderFactory
+import dev.stele.cli.config.ConfigLoader
 import dev.stele.cli.requireDb
 import dev.stele.core.db.openDb
 import dev.stele.core.store.GraphStore
@@ -18,12 +20,24 @@ class SearchCommand : CliktCommand(
 
     override fun run() {
         val conn = openDb(requireDb().path)
-        val hits = GraphStore(conn).searchConcepts(query, limit)
+        val store = GraphStore(conn)
+        var hits = store.searchConcepts(query, limit)
+        var how = "substring"
+        if (hits.isEmpty()) {
+            // Conversational phrasing: fall back to the stored concept-card vectors.
+            val embedder = EmbedderFactory.fromConfig(ConfigLoader.findAndLoad()?.llm)
+            val qVec = runCatching { embedder.embedQuery(query) }.getOrNull()
+            if (qVec != null) {
+                hits = store.resolveSemanticConcepts(qVec, embedder.name, topK = minOf(limit, 5))
+                how = "semantic"
+            }
+        }
         conn.close()
         if (hits.isEmpty()) {
-            echo("No concepts matching \"$query\". Try `stele build-ontology` first, or a broader term.")
+            echo("No concepts matching \"$query\". Try `stele build-ontology` + `stele embed` first, or a broader term.")
             return
         }
+        if (how == "semantic") echo("(no substring match — semantic results)\n")
         for (c in hits) {
             echo("• ${c.name}" + (c.boundedContext?.let { "  [$it]" } ?: ""))
             c.definition?.takeIf { it.isNotBlank() }?.let { echo("    $it") }

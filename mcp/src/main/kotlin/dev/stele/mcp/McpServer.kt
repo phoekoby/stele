@@ -1,5 +1,6 @@
 package dev.stele.mcp
 
+import dev.stele.core.embed.Embedder
 import dev.stele.core.store.GraphStore
 import dev.stele.core.store.UsageLog
 import kotlinx.serialization.json.Json
@@ -25,6 +26,8 @@ class McpServer(
     private val store: GraphStore,
     private val usage: UsageLog? = null,
     private val repoRoot: java.io.File? = null,
+    /** Semantic layer: query embedding for concept resolution + question-aware doc drill. */
+    private val embedder: Embedder? = null,
 ) {
     private val json = Json { }
 
@@ -147,11 +150,29 @@ class McpServer(
             text.contains("no concept linked")
         )
 
+    /**
+     * Resolve exact name/alias first (cheap, precise), then semantically against the
+     * stored concept-card vectors — this is what lets a conversational phrasing
+     * ("how do refunds work?") land on the right concept (measured: 60% → 90%).
+     */
+    private fun resolve(term: String): Pair<dev.stele.core.model.Concept, FloatArray?>? {
+        val qVec = embedder?.let { runCatching { it.embedQuery(term) }.getOrNull() }
+        store.resolveConcept(term)?.let { return it to qVec }
+        if (qVec != null) {
+            store.resolveSemanticConcepts(qVec, embedder!!.name, topK = 1).firstOrNull()?.let { return it to qVec }
+        }
+        return null
+    }
+
     private fun conceptContext(term: String): String {
         if (term.isBlank()) return "Provide a concept name."
-        val c = store.resolveConcept(term) ?: return "No concept matching \"$term\". Try `stele build-ontology` first."
+        val (c, qVec) = resolve(term) ?: return "No concept matching \"$term\". Try `stele build-ontology` first."
         val impls = store.implementersOf(c.id)
-        val docs = store.describingDocs(c.id)
+        // Question-aware drill: rank the concept's sections by the query, not by edge
+        // confidence alone — a concept can own 100+ sections, the right 4 matter.
+        val docs = store.describingDocs(c.id).let {
+            if (qVec != null) store.rankDocsForQuery(it, qVec, embedder!!.name) else it
+        }
         val related = store.relatedConcepts(c.id)
         val rules = store.rulesFor(c.id)
         return buildString {
@@ -159,7 +180,7 @@ class McpServer(
             c.boundedContext?.let { append("  [$it]") }
             append('\n')
             c.definition?.let { append(it).append('\n') }
-            if (c.aliases.isNotEmpty()) append("aliases: ${c.aliases.joinToString(", ")}\n")
+            if (c.aliases.isNotEmpty()) append("aliases: ${c.aliases.take(12).joinToString(", ")}\n")
             if (related.isNotEmpty()) append("related concepts: ${related.take(10).joinToString(", ") { it.name }}\n")
             if (rules.isNotEmpty()) {
                 append("\nproduct rules:\n")
@@ -167,16 +188,21 @@ class McpServer(
             }
             if (docs.isNotEmpty()) {
                 append("\ndescribed in product docs:\n")
-                for (d in docs.take(6)) {
-                    append("  • ${d.title}  (${d.ref})\n")
-                    snippet(d.body)?.let { append("      $it\n") }
+                for (d in docs.take(4)) {
+                    // Agent-layer sections (skills/plans/CLAUDE.md) are typed and flagged
+                    // when their file changed since indexing — instructions rot silently.
+                    val agent = d.layer == dev.stele.core.model.Layer.AGENT
+                    val stale = agent && repoRoot != null && store.isStale(d.ref.substringBefore('#'), repoRoot)
+                    append("  • ${if (agent) "[agent] " else ""}${d.title}  (${d.ref})${if (stale) "  ⚠ file changed since indexed" else ""}\n")
+                    // Section BODY, not just the title — content answers, pointers don't.
+                    d.body?.takeIf { it.isNotBlank() }?.let { append("      ${it.take(700).trim().replace("\n", "\n      ")}\n") }
                 }
             }
             val byFile = impls.groupBy { it.ref.substringBefore('#') }
-            append("\nimplemented by ${impls.size} symbols across ${byFile.size} files:\n")
-            for ((file, syms) in byFile.entries.sortedBy { it.key }) {
+            append("\nimplemented by ${impls.size} symbols across ${byFile.size} files, main ones:\n")
+            for ((file, syms) in byFile.entries.sortedByDescending { it.value.size }.take(15)) {
                 append("  ${lang(file)} $file\n")
-                append("      ${syms.joinToString(", ") { it.title ?: it.ref }}\n")
+                append("      ${syms.take(12).joinToString(", ") { it.title ?: it.ref }}\n")
             }
         }.trimEnd()
     }
