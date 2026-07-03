@@ -1,6 +1,7 @@
 package dev.stele.cli.commands
 
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.PrintMessage
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import dev.stele.cli.ConnectorRegistry
@@ -54,7 +55,11 @@ class SyncCommand : CliktCommand(
                 cfg.llm.provider, cfg.llm.model, cfg.llm.ollamaUrl, responses, cfg.llm.baseUrl, cfg.llm.apiKeyEnv,
             )
             echo("ontology: canonicalizing via ${llm.name} …")
-            val o = canonicalize(store, llm, batchSize = cfg.llm.batch)
+            // A first-run LLM failure (model not pulled, server down) must be a clean,
+            // actionable message — not a stack trace. The graph is safe: canonicalize
+            // aborts before changing anything, and a re-run of `sync` resumes (symbols
+            // are incremental, resolved concepts stay resolved).
+            val o = llmStep(llm.name) { canonicalize(store, llm, batchSize = cfg.llm.batch) }
             echo("  • ${o.kept} concepts kept (${o.renamed} renamed), ${o.dropped} dropped, ${o.skipped} unresolved")
 
             val d = store.dedupeByName()
@@ -63,7 +68,7 @@ class SyncCommand : CliktCommand(
             runSources(store, docs, "doc sources")
 
             echo("rules: refining via ${llm.name} …")
-            val r = refineRules(store, llm, batchSize = cfg.llm.batch)
+            val r = llmStep(llm.name) { refineRules(store, llm, batchSize = cfg.llm.batch) }
             echo("  • ${r.kept} kept (${r.rewritten} rewritten), ${r.dropped} dropped")
         } else {
             val d = store.dedupeByName()
@@ -84,6 +89,20 @@ class SyncCommand : CliktCommand(
         conn.close()
         echo("✓ sync complete")
     }
+
+    /** Turns raw LLM failures into a clean, actionable CLI error. */
+    private fun <T> llmStep(llmName: String, step: () -> T): T =
+        try {
+            step()
+        } catch (e: RuntimeException) {
+            throw PrintMessage(
+                "LLM step failed via $llmName: ${e.message}\n" +
+                    "  • local model missing?  ollama pull <model>   (then check `ollama list` and llm.model in stele.yml)\n" +
+                    "  • or run offline:       stele sync --no-llm",
+                statusCode = 1,
+                printError = true,
+            )
+        }
 
     private fun runSources(store: GraphStore, sources: List<SourceConfig>, label: String) {
         if (sources.isEmpty()) return

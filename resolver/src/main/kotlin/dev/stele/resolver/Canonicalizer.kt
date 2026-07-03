@@ -73,7 +73,13 @@ fun canonicalize(
             else -> {
                 val name = v.name.ifBlank { c.name }
                 if (name != c.name) renamed++
-                store.updateConcept(c.id, name, v.definition.ifBlank { null }, v.boundedContext.ifBlank { null }, v.aliases)
+                // A rename must NEVER lose the original cluster name — it's the term the
+                // code (folder) and possibly the team actually use; keep it as an alias
+                // so lexical + semantic resolution keep the bridge. (Measured: an 8B
+                // canonicalizer renames liberally; without this the product language
+                // detaches from the graph.)
+                val aliases = if (name != c.name) (v.aliases + c.name).distinct() else v.aliases
+                store.updateConcept(c.id, name, v.definition.ifBlank { null }, v.boundedContext.ifBlank { null }, aliases)
                 kept++
             }
         }
