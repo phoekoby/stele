@@ -55,12 +55,15 @@ class SteleArm(
                 // Question-aware drill: the ontology narrows to the right concept, but a
                 // concept can own 100+ sections — serve the ones nearest to the QUESTION
                 // (vector RAG's one real advantage, applied inside the graph neighbourhood).
+                // Content DENSITY matters as much as content choice (measured: at 700-char
+                // bodies the arm under-spent its token budget and lost the answer axis to
+                // raw chunks despite 3× the recall). Spend the same budget the baseline gets.
                 val docs = rankForQuestion(question, store.describingDocs(c.id))
                 if (docs.isNotEmpty()) {
                     append("docs:\n")
-                    for (d in docs.take(4)) {
+                    for (d in docs.take(6)) {
                         append("  ## ${d.title} (${d.ref})\n")
-                        d.body?.takeIf { it.isNotBlank() }?.let { append("  ${it.take(700).trim()}\n") }
+                        d.body?.takeIf { it.isNotBlank() }?.let { append("  ${it.take(1400).trim()}\n") }
                         refs += d.ref
                     }
                 }
@@ -69,8 +72,8 @@ class SteleArm(
                 val impls = store.implementersOf(c.id)
                 val byFile = impls.groupBy { it.ref.substringBefore('#') }
                 append("implemented by ${impls.size} symbols across ${byFile.size} files, main ones:\n")
-                for ((file, syms) in byFile.entries.sortedByDescending { it.value.size }.take(10)) {
-                    append("  $file: ${syms.take(12).joinToString(", ") { it.title ?: it.ref }}\n")
+                for ((file, syms) in byFile.entries.sortedByDescending { it.value.size }.take(6)) {
+                    append("  $file: ${syms.take(8).joinToString(", ") { it.title ?: it.ref }}\n")
                     refs += file
                 }
                 append('\n')
