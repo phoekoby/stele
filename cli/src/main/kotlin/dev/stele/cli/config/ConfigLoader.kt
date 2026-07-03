@@ -23,7 +23,7 @@ object ConfigLoader {
         # Configure once, then run the whole pipeline with:  stele sync
         llm:
           provider: ollama            # ollama (local) | anthropic | deepseek | openai | <any OpenAI-compatible>
-          model: llama3.1             # provider-specific model id (e.g. deepseek-chat, gpt-4o-mini)
+          model: llama3.1             # must exist locally: `ollama pull llama3.1` / check `ollama list`
           ollamaUrl: http://localhost:11434
           batch: 8
           embedProvider: hashing      # semantic layer: hashing (offline floor) | ollama (nomic — the measured 90%)
