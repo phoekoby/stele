@@ -8,6 +8,8 @@ enum class Layer(val value: String) {
     PRODUCT("product"),
     EVIDENCE("evidence"),
     CONFIG("config"),
+    /** AI-agent instructions living in the repo: skills, CLAUDE.md/AGENTS.md, plans. */
+    AGENT("agent"),
 }
 
 enum class ArtifactKind(val value: String) {

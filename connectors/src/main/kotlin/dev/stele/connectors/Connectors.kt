@@ -3,6 +3,7 @@ package dev.stele.connectors
 import dev.stele.connectors.codegraph.AstIndexSource
 import dev.stele.connectors.codegraph.JsonCodeGraphSource
 import dev.stele.connectors.codegraph.ingestCodeGraph
+import dev.stele.connectors.docs.ingestAgents
 import dev.stele.connectors.docs.ingestDocs
 import dev.stele.connectors.docs.ingestWeb
 import dev.stele.core.connector.Connector
@@ -17,6 +18,16 @@ object DocsConnector : Connector {
     override fun ingest(store: GraphStore, params: ConnectorParams): String {
         val r = ingestDocs(store, params.path ?: ".")
         return "${r.docs} docs, ${r.sections} sections, ${r.links} describes, ${r.rules} rules"
+    }
+}
+
+object AgentsConnector : Connector {
+    override val type = "agents"
+    override val help = ".agents/.claude/.opencode skills, plans, CLAUDE.md → concepts (typed AGENT layer, no ontology enrichment)"
+    override val phase = ConnectorPhase.DOC
+    override fun ingest(store: GraphStore, params: ConnectorParams): String {
+        val r = ingestAgents(store, params.path ?: ".")
+        return "${r.docs} agent files, ${r.sections} sections, ${r.links} describes"
     }
 }
 

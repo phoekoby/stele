@@ -8,6 +8,7 @@ import dev.stele.cli.requireDb
 import dev.stele.connectors.codegraph.AstIndexSource
 import dev.stele.connectors.codegraph.JsonCodeGraphSource
 import dev.stele.connectors.codegraph.ingestCodeGraph
+import dev.stele.connectors.docs.ingestAgents
 import dev.stele.connectors.docs.ingestDocs
 import dev.stele.connectors.docs.ingestWeb
 import dev.stele.core.db.migrate
@@ -75,6 +76,21 @@ class IngestDocsCommand : CliktCommand(
             "✓ docs: ${res.docs} docs, ${res.sections} sections, ${res.links} describes, " +
                 "${res.aliasesAdded} aliases, ${res.relations} concept↔concept, ${res.rules} rules",
         )
+    }
+}
+
+class IngestAgentsCommand : CliktCommand(
+    name = "agents",
+    help = "Ingest agent instructions (.agents/.claude/.opencode, CLAUDE.md) as a typed AGENT layer",
+) {
+    private val path by argument(name = "path", help = "Repo root to scan")
+
+    override fun run() {
+        val conn = openDb(requireDb().path)
+        migrate(conn) // agent files record mtimes into source_files
+        val res = ingestAgents(GraphStore(conn), path)
+        conn.close()
+        echo("✓ agents: ${res.docs} files, ${res.sections} sections, ${res.links} describes (no ontology enrichment)")
     }
 }
 

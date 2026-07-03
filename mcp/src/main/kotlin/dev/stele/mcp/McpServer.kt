@@ -189,7 +189,11 @@ class McpServer(
             if (docs.isNotEmpty()) {
                 append("\ndescribed in product docs:\n")
                 for (d in docs.take(4)) {
-                    append("  • ${d.title}  (${d.ref})\n")
+                    // Agent-layer sections (skills/plans/CLAUDE.md) are typed and flagged
+                    // when their file changed since indexing — instructions rot silently.
+                    val agent = d.layer == dev.stele.core.model.Layer.AGENT
+                    val stale = agent && repoRoot != null && store.isStale(d.ref.substringBefore('#'), repoRoot)
+                    append("  • ${if (agent) "[agent] " else ""}${d.title}  (${d.ref})${if (stale) "  ⚠ file changed since indexed" else ""}\n")
                     // Section BODY, not just the title — content answers, pointers don't.
                     d.body?.takeIf { it.isNotBlank() }?.let { append("      ${it.take(700).trim().replace("\n", "\n      ")}\n") }
                 }

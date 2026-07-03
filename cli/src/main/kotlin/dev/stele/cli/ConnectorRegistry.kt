@@ -1,5 +1,6 @@
 package dev.stele.cli
 
+import dev.stele.connectors.AgentsConnector
 import dev.stele.connectors.AstIndexConnector
 import dev.stele.connectors.CodeGraphConnector
 import dev.stele.connectors.DocsConnector
@@ -12,7 +13,7 @@ import dev.stele.extractors.SymbolsConnector
 object ConnectorRegistry {
     val all: List<Connector> = listOf(
         SymbolsConnector, CodeConnector,
-        DocsConnector, WebConnector,
+        DocsConnector, AgentsConnector, WebConnector,
         CodeGraphConnector, AstIndexConnector,
     )
 

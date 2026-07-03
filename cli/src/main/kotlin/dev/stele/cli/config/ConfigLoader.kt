@@ -26,6 +26,8 @@ object ConfigLoader {
           model: llama3.1             # provider-specific model id (e.g. deepseek-chat, gpt-4o-mini)
           ollamaUrl: http://localhost:11434
           batch: 8
+          embedProvider: hashing      # semantic layer: hashing (offline floor) | ollama (nomic — the measured 90%)
+          embedModel: nomic-embed-text
           # Cloud example — DeepSeek (set DEEPSEEK_API_KEY in your env):
           #   provider: deepseek
           #   model: deepseek-chat
@@ -34,6 +36,7 @@ object ConfigLoader {
         sources:
           - { type: symbols, path: "." }     # code -> candidate concepts (tree-sitter, incremental)
           - { type: docs,    path: "." }     # Markdown product docs -> concepts, rules, relations
+          - { type: agents,  path: "." }     # .agents/.claude skills, plans, CLAUDE.md -> typed AGENT layer
           # - { type: web,   urls: ["https://your-wiki/spec", "https://jira/browse/PROJ-1"] }
           # - { type: astindex,  path: "~/.../ast-index/<hash>/index.db" }
           # - { type: codegraph, path: "gitnexus-export.json" }
