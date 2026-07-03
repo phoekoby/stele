@@ -68,12 +68,12 @@ private class Term(val regex: Regex, val conceptId: String)
 /** One source document feeding the linker: a stable ref, a display name, and markdown-ish content (# headings). */
 private data class RawDoc(val ref: String, val name: String, val content: String)
 
-fun ingestDocs(store: GraphStore, rootArg: String): DocsIngestResult {
+fun ingestDocs(store: GraphStore, rootArg: String, refPrefix: String = ""): DocsIngestResult {
     val root = File(rootArg).absoluteFile.normalize()
     val rootPath = root.toPath()
     val raws = walkDocs(root).mapNotNull { file ->
         val content = runCatching { file.readText() }.getOrNull() ?: return@mapNotNull null
-        RawDoc(rootPath.relativize(file.toPath()).toString().replace('\\', '/'), file.name, content)
+        RawDoc(refPrefix + rootPath.relativize(file.toPath()).toString().replace('\\', '/'), file.name, content)
     }.toList()
     return linkDocs(store, raws, "docs")
 }
@@ -89,7 +89,7 @@ private val AGENT_EXT = DOC_EXT + "mdc" // .cursor rules use .mdc
  * instructions — but they are NOT product language: no alias enrichment, no
  * concept↔concept relations, no product rules are derived from them.
  */
-fun ingestAgents(store: GraphStore, rootArg: String): DocsIngestResult {
+fun ingestAgents(store: GraphStore, rootArg: String, refPrefix: String = ""): DocsIngestResult {
     val root = File(rootArg).absoluteFile.normalize()
     val rootPath = root.toPath()
     val files = buildList {
@@ -103,7 +103,7 @@ fun ingestAgents(store: GraphStore, rootArg: String): DocsIngestResult {
     }
     val raws = files.mapNotNull { file ->
         val content = runCatching { file.readText() }.getOrNull() ?: return@mapNotNull null
-        val ref = rootPath.relativize(file.toPath()).toString().replace('\\', '/')
+        val ref = refPrefix + rootPath.relativize(file.toPath()).toString().replace('\\', '/')
         // mtime recorded → `stats`/`isStale` flag agent instructions whose file changed.
         store.recordFile(ref, file.lastModified())
         RawDoc(ref, file.name, content)

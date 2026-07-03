@@ -163,3 +163,27 @@ Three lessons, in the order the data forced them:
    right artifacts are in context 87.5% vs 29.2%).
 3. **Agentic grep on a 3B is the significantly worst option at 2.7× the cost** — the
    strongest evidence yet for "small models need curated context, not a search loop".
+
+## Cross-repo (Stage D) — one graph over two real repos
+
+Workspace layout: `documenso/` (the product) + `sdk-typescript/` (its official SDK) feed ONE
+graph; refs are repo-prefixed (`documenso/packages/…`, `sdk-typescript/src/…`). 10 questions
+(`golden.workspace.yml`) whose gold artifacts require BOTH repos — recall = cross-repo coverage.
+
+```
+arm         concept-hit  artifact-recall  ~tokens  latency
+stele-sem      80%           75%           2122     0.3s
+stele          70%           45%           2255     16ms
+vector           —           50%*          2244     157s (26-min two-repo index on q1)
+```
+*vector's 50% is flattered: bare-repo gold prefixes match any chunk from that repo.
+
+What the graph does here that chunks structurally can't: one question ("how do I create a
+document from a template with the TypeScript SDK?") resolves to concepts and returns the
+core repo's SDK guide, the SDK's README, and the SDK code map in one slice — because both
+repos attach to the same concept spine.
+
+Lesson (kept honestly): **alias errors compound.** One wrong seed alias in a canonicalization
+verdict ("SDK" on the Embedding concept) attracted more wrong aliases at doc-ingest time
+("Using the TypeScript SDK" → Embedding) and skewed resolution until cleaned. Concept-card
+quality is a first-class input; alias provenance tracking is on the roadmap.
