@@ -34,4 +34,19 @@ class RuleExtractionTest {
     fun `drops plain prose with no constraint keyword`() {
         assertFalse(isProseRule("This document maps the api surface for developers."))
     }
+
+    @Test
+    fun `drops code lines that happen to contain a constraint keyword`() {
+        // These all carry must/only/return etc. and previously survived as "product rules".
+        val code = listOf(
+            "if (document.status === 'COMPLETED') return; // must guard",
+            "const MAX_RETRIES = 5; // only retry a few times",
+            "throw new Error('Document must be completed to download');",
+            "return recipients.every((r) => r.status === 'SIGNED');",
+            "<Tabs items={['Everyone', 'Managers and above', 'Admins only']}>",
+            "Each recipient object must include:",
+            "export const canView = (doc) => doc.ownerId === userId;",
+        )
+        for (c in code) assertFalse(isProseRule(c), "should drop code: $c")
+    }
 }

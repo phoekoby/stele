@@ -1,0 +1,544 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1783340364687,
+  "projectRoot": "/Users/phoekobyy/Projects/stele",
+  "techStack": {
+    "languages": [
+      {
+        "name": "Kotlin",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "build.gradle.kts"
+        ]
+      }
+    ],
+    "frameworks": [],
+    "packageManager": "gradle",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": null,
+    "lintCommand": null,
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "docs"
+    ],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "cli": {
+      "path": "cli",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1783340364673,
+      "keyFiles": [
+        "build.gradle.kts"
+      ]
+    },
+    "connectors": {
+      "path": "connectors",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1783340364673,
+      "keyFiles": [
+        "build.gradle.kts"
+      ]
+    },
+    "core": {
+      "path": "core",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1783340364674,
+      "keyFiles": [
+        "build.gradle.kts"
+      ]
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 6,
+      "lastAccessed": 1783340364674,
+      "keyFiles": [
+        "architecture.md",
+        "build-spec.md",
+        "engine-architecture.md",
+        "linking-design.md",
+        "phase-1-spec.md"
+      ]
+    },
+    "eval": {
+      "path": "eval",
+      "purpose": null,
+      "fileCount": 11,
+      "lastAccessed": 1783340364675,
+      "keyFiles": [
+        "PROTOCOL.md",
+        "README.md",
+        "build.gradle.kts",
+        "check.py",
+        "check_documenso.py"
+      ]
+    },
+    "extractors": {
+      "path": "extractors",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1783340364675,
+      "keyFiles": [
+        "build.gradle.kts"
+      ]
+    },
+    "gradle": {
+      "path": "gradle",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1783340364675,
+      "keyFiles": []
+    },
+    "integrations": {
+      "path": "integrations",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1783340364676,
+      "keyFiles": []
+    },
+    "mcp": {
+      "path": "mcp",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1783340364676,
+      "keyFiles": [
+        "build.gradle.kts"
+      ]
+    },
+    "packaging": {
+      "path": "packaging",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1783340364676,
+      "keyFiles": [
+        "README.md"
+      ]
+    },
+    "resolver": {
+      "path": "resolver",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1783340364676,
+      "keyFiles": [
+        "build.gradle.kts"
+      ]
+    },
+    "cli/build": {
+      "path": "cli/build",
+      "purpose": "Build output",
+      "fileCount": 0,
+      "lastAccessed": 1783340364677,
+      "keyFiles": []
+    },
+    "cli/src": {
+      "path": "cli/src",
+      "purpose": "Source code",
+      "fileCount": 0,
+      "lastAccessed": 1783340364677,
+      "keyFiles": []
+    },
+    "connectors/build": {
+      "path": "connectors/build",
+      "purpose": "Build output",
+      "fileCount": 0,
+      "lastAccessed": 1783340364678,
+      "keyFiles": []
+    },
+    "connectors/src": {
+      "path": "connectors/src",
+      "purpose": "Source code",
+      "fileCount": 0,
+      "lastAccessed": 1783340364678,
+      "keyFiles": []
+    },
+    "core/build": {
+      "path": "core/build",
+      "purpose": "Build output",
+      "fileCount": 0,
+      "lastAccessed": 1783340364678,
+      "keyFiles": []
+    },
+    "core/src": {
+      "path": "core/src",
+      "purpose": "Source code",
+      "fileCount": 0,
+      "lastAccessed": 1783340364678,
+      "keyFiles": []
+    },
+    "eval/build": {
+      "path": "eval/build",
+      "purpose": "Build output",
+      "fileCount": 0,
+      "lastAccessed": 1783340364679,
+      "keyFiles": []
+    },
+    "extractors/build": {
+      "path": "extractors/build",
+      "purpose": "Build output",
+      "fileCount": 0,
+      "lastAccessed": 1783340364680,
+      "keyFiles": []
+    },
+    "extractors/src": {
+      "path": "extractors/src",
+      "purpose": "Source code",
+      "fileCount": 0,
+      "lastAccessed": 1783340364680,
+      "keyFiles": []
+    },
+    "mcp/build": {
+      "path": "mcp/build",
+      "purpose": "Build output",
+      "fileCount": 0,
+      "lastAccessed": 1783340364682,
+      "keyFiles": []
+    },
+    "mcp/src": {
+      "path": "mcp/src",
+      "purpose": "Source code",
+      "fileCount": 0,
+      "lastAccessed": 1783340364682,
+      "keyFiles": []
+    },
+    "resolver/build": {
+      "path": "resolver/build",
+      "purpose": "Build output",
+      "fileCount": 0,
+      "lastAccessed": 1783340364682,
+      "keyFiles": []
+    },
+    "resolver/src": {
+      "path": "resolver/src",
+      "purpose": "Source code",
+      "fileCount": 0,
+      "lastAccessed": 1783340364683,
+      "keyFiles": []
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "core/src/main/kotlin/dev/stele/core/store/GraphStore.kt",
+      "accessCount": 41,
+      "lastAccessed": 1783342466848,
+      "type": "file"
+    },
+    {
+      "path": "cli/src/main/kotlin/dev/stele/cli/commands/AskCommand.kt",
+      "accessCount": 12,
+      "lastAccessed": 1783341227886,
+      "type": "file"
+    },
+    {
+      "path": "eval/src/main/kotlin/dev/stele/eval/Metrics.kt",
+      "accessCount": 9,
+      "lastAccessed": 1783341181638,
+      "type": "file"
+    },
+    {
+      "path": "extractors/src/main/kotlin/dev/stele/extractors/SymbolExtractor.kt",
+      "accessCount": 9,
+      "lastAccessed": 1783341190473,
+      "type": "file"
+    },
+    {
+      "path": "connectors/src/main/kotlin/dev/stele/connectors/docs/DocsIngest.kt",
+      "accessCount": 8,
+      "lastAccessed": 1783342369833,
+      "type": "file"
+    },
+    {
+      "path": "eval/README.md",
+      "accessCount": 7,
+      "lastAccessed": 1783341227244,
+      "type": "file"
+    },
+    {
+      "path": "core/src/main/kotlin/dev/stele/core/connector/Connector.kt",
+      "accessCount": 7,
+      "lastAccessed": 1783341489623,
+      "type": "file"
+    },
+    {
+      "path": "resolver/src/main/kotlin/dev/stele/resolver/Canonicalizer.kt",
+      "accessCount": 7,
+      "lastAccessed": 1783342306798,
+      "type": "file"
+    },
+    {
+      "path": "README.md",
+      "accessCount": 6,
+      "lastAccessed": 1783341152306,
+      "type": "file"
+    },
+    {
+      "path": "mcp/src/main/kotlin/dev/stele/mcp/McpServer.kt",
+      "accessCount": 6,
+      "lastAccessed": 1783341159419,
+      "type": "file"
+    },
+    {
+      "path": "cli/src/main/kotlin/dev/stele/cli/commands/SyncCommand.kt",
+      "accessCount": 6,
+      "lastAccessed": 1783341170367,
+      "type": "file"
+    },
+    {
+      "path": "eval/src/main/kotlin/dev/stele/eval/EvalRunner.kt",
+      "accessCount": 6,
+      "lastAccessed": 1783341190272,
+      "type": "file"
+    },
+    {
+      "path": "core/src/main/kotlin/dev/stele/core/embed/Embedder.kt",
+      "accessCount": 6,
+      "lastAccessed": 1783342234388,
+      "type": "file"
+    },
+    {
+      "path": "eval/src/main/kotlin/dev/stele/eval/SteleArm.kt",
+      "accessCount": 5,
+      "lastAccessed": 1783341084410,
+      "type": "file"
+    },
+    {
+      "path": "eval/src/main/kotlin/dev/stele/eval/GoldenSet.kt",
+      "accessCount": 5,
+      "lastAccessed": 1783341181440,
+      "type": "file"
+    },
+    {
+      "path": "eval/golden.documenso.yml",
+      "accessCount": 4,
+      "lastAccessed": 1783341080308,
+      "type": "file"
+    },
+    {
+      "path": "eval/src/main/kotlin/dev/stele/eval/VectorRagArm.kt",
+      "accessCount": 4,
+      "lastAccessed": 1783341091919,
+      "type": "file"
+    },
+    {
+      "path": "resolver/src/main/kotlin/dev/stele/resolver/Embedders.kt",
+      "accessCount": 4,
+      "lastAccessed": 1783341092991,
+      "type": "file"
+    },
+    {
+      "path": "cli/src/main/kotlin/dev/stele/cli/Main.kt",
+      "accessCount": 4,
+      "lastAccessed": 1783341133781,
+      "type": "file"
+    },
+    {
+      "path": "extractors/src/test/kotlin/dev/stele/extractors/MultiRepoTest.kt",
+      "accessCount": 4,
+      "lastAccessed": 1783341146713,
+      "type": "file"
+    },
+    {
+      "path": "connectors/src/test/kotlin/dev/stele/connectors/docs/RuleExtractionTest.kt",
+      "accessCount": 4,
+      "lastAccessed": 1783342561438,
+      "type": "file"
+    },
+    {
+      "path": "eval/PROTOCOL.md",
+      "accessCount": 3,
+      "lastAccessed": 1783340964752,
+      "type": "file"
+    },
+    {
+      "path": "docs/architecture.md",
+      "accessCount": 3,
+      "lastAccessed": 1783341001247,
+      "type": "file"
+    },
+    {
+      "path": "core/src/main/kotlin/dev/stele/core/db/Database.kt",
+      "accessCount": 3,
+      "lastAccessed": 1783341042206,
+      "type": "file"
+    },
+    {
+      "path": "cli/src/main/kotlin/dev/stele/cli/EmbedderFactory.kt",
+      "accessCount": 3,
+      "lastAccessed": 1783341073015,
+      "type": "file"
+    },
+    {
+      "path": "core/src/main/resources/db/changelog/changes/003-source-files.sql",
+      "accessCount": 3,
+      "lastAccessed": 1783341147113,
+      "type": "file"
+    },
+    {
+      "path": "eval/src/main/kotlin/dev/stele/eval/AgenticArm.kt",
+      "accessCount": 3,
+      "lastAccessed": 1783341183458,
+      "type": "file"
+    },
+    {
+      "path": "eval/src/test/kotlin/dev/stele/eval/MetricsTest.kt",
+      "accessCount": 3,
+      "lastAccessed": 1783341200419,
+      "type": "file"
+    },
+    {
+      "path": "core/src/main/kotlin/dev/stele/core/embed/Cards.kt",
+      "accessCount": 2,
+      "lastAccessed": 1783340862499,
+      "type": "file"
+    },
+    {
+      "path": "cli/src/main/kotlin/dev/stele/cli/commands/EvalCommand.kt",
+      "accessCount": 2,
+      "lastAccessed": 1783340918954,
+      "type": "file"
+    },
+    {
+      "path": "cli/src/main/kotlin/dev/stele/cli/commands/ReviewCommand.kt",
+      "accessCount": 2,
+      "lastAccessed": 1783340962615,
+      "type": "file"
+    },
+    {
+      "path": "docs/validation-kit.md",
+      "accessCount": 2,
+      "lastAccessed": 1783341001388,
+      "type": "file"
+    },
+    {
+      "path": "core/src/main/kotlin/dev/stele/core/db/Migrations.kt",
+      "accessCount": 2,
+      "lastAccessed": 1783341011711,
+      "type": "file"
+    },
+    {
+      "path": "eval/src/main/kotlin/dev/stele/eval/Judge.kt",
+      "accessCount": 2,
+      "lastAccessed": 1783341060187,
+      "type": "file"
+    },
+    {
+      "path": "connectors/src/main/kotlin/dev/stele/connectors/Connectors.kt",
+      "accessCount": 2,
+      "lastAccessed": 1783341111675,
+      "type": "file"
+    },
+    {
+      "path": "eval/golden.workspace.yml",
+      "accessCount": 2,
+      "lastAccessed": 1783341206196,
+      "type": "file"
+    },
+    {
+      "path": "core/src/main/kotlin/dev/stele/core/model/Enums.kt",
+      "accessCount": 1,
+      "lastAccessed": 1783340795963,
+      "type": "file"
+    },
+    {
+      "path": "core/src/main/kotlin/dev/stele/core/model/Entities.kt",
+      "accessCount": 1,
+      "lastAccessed": 1783340796951,
+      "type": "file"
+    },
+    {
+      "path": "core/src/main/resources/db/changelog/db.changelog-master.xml",
+      "accessCount": 1,
+      "lastAccessed": 1783340807165,
+      "type": "file"
+    },
+    {
+      "path": "docs/engine-architecture.md",
+      "accessCount": 1,
+      "lastAccessed": 1783340807248,
+      "type": "file"
+    },
+    {
+      "path": "core/src/main/resources/db/changelog/changes/001-initial-schema.sql",
+      "accessCount": 1,
+      "lastAccessed": 1783340807734,
+      "type": "file"
+    },
+    {
+      "path": "eval/src/main/kotlin/dev/stele/eval/Arms.kt",
+      "accessCount": 1,
+      "lastAccessed": 1783340808381,
+      "type": "file"
+    },
+    {
+      "path": "core/src/main/resources/db/changelog/changes/002-indexes.sql",
+      "accessCount": 1,
+      "lastAccessed": 1783340808640,
+      "type": "file"
+    },
+    {
+      "path": "core/src/main/resources/db/changelog/changes/004-vectors.sql",
+      "accessCount": 1,
+      "lastAccessed": 1783340810191,
+      "type": "file"
+    },
+    {
+      "path": "CLAUDE.md",
+      "accessCount": 1,
+      "lastAccessed": 1783340811059,
+      "type": "file"
+    },
+    {
+      "path": "extractors/src/main/kotlin/dev/stele/extractors/FileWalker.kt",
+      "accessCount": 1,
+      "lastAccessed": 1783340812278,
+      "type": "file"
+    },
+    {
+      "path": "extractors/src/main/kotlin/dev/stele/extractors/CodeExtractor.kt",
+      "accessCount": 1,
+      "lastAccessed": 1783340812736,
+      "type": "file"
+    },
+    {
+      "path": "eval/src/main/kotlin/dev/stele/eval/Answerer.kt",
+      "accessCount": 1,
+      "lastAccessed": 1783340815182,
+      "type": "file"
+    },
+    {
+      "path": "extractors/src/main/kotlin/dev/stele/extractors/Connectors.kt",
+      "accessCount": 1,
+      "lastAccessed": 1783340832585,
+      "type": "file"
+    },
+    {
+      "path": "connectors/src/test/kotlin/dev/stele/connectors/docs/AgentLayerTest.kt",
+      "accessCount": 1,
+      "lastAccessed": 1783340862458,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

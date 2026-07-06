@@ -245,17 +245,35 @@ private fun linkDocs(
 // constraint keywords ("only", "required", "нельзя") but aren't product rules.
 private val SCHEMA_TOKEN = Regex("\\b(FK|PK|uuid|varchar)\\b", RegexOption.IGNORE_CASE)
 
-internal fun isProseRule(s: String): Boolean =
-    s.length in 12..240 &&
-        CONSTRAINT.containsMatchIn(s) &&
-        !s.contains('|') && // markdown table row
-        !s.contains("://") && // URL / connection string
-        s.count { it == '`' } < 4 && // code/schema-dense line
-        !(s.contains('=') && SCHEMA_TOKEN.containsMatchIn(s)) // schema column def
+// Fenced code blocks — stripped before sentence-splitting so code never becomes a "rule".
+private val FENCED = Regex("(?s)```.*?```")
+
+// Tokens that only appear in code, not product prose. An LLM auditor will happily "verify"
+// that `require('path')` complies with a rule, so these lines must never become rules.
+private val CODE_TOKEN = Regex("//|/\\*|\\*/|=>|->|==|!=|\\);|::|\\brequire\\(|\\bfunction\\b|\\bconst\\b|\\blet\\b|\\breturn\\b|\\bimport\\b|\\bexport\\b")
+
+// Structural / code-punctuation density: prose stays well under 15%.
+private val SYMBOLS = setOf('{', '}', '(', ')', '[', ']', '<', '>', '=', ';', '/', '\\', '|', '&', '$', '#', '@', '~', '^', '*')
+
+internal fun isProseRule(s: String): Boolean {
+    if (s.length !in 12..240) return false
+    if (!CONSTRAINT.containsMatchIn(s)) return false
+    if (s.contains('|')) return false // markdown table row
+    if (s.contains("://")) return false // URL / connection string
+    if (s.count { it == '`' } >= 4) return false // code/schema-dense line
+    if (s.contains('=') && SCHEMA_TOKEN.containsMatchIn(s)) return false // schema column def
+    // Code-shape rejects.
+    if (s.startsWith("<")) return false // JSX / HTML fragment
+    val trimmed = s.trimEnd()
+    if (trimmed.endsWith(":") || trimmed.endsWith("{") || trimmed.endsWith(";")) return false // list header / code line
+    if (CODE_TOKEN.containsMatchIn(s)) return false
+    if (s.count { it in SYMBOLS }.toDouble() / s.length > 0.15) return false // symbol-dense = code, not prose
+    return true
+}
 
 /** Extract up to a few product-constraint sentences from a doc section body. */
 private fun rulesIn(body: String): List<String> =
-    body.split(SENTENCE)
+    FENCED.replace(body, " ").split(SENTENCE) // drop fenced code first
         .map { it.trim().trim('-', '*', '•', '>', ' ', '\t').replace(WS, " ") }
         .filter(::isProseRule)
         .distinct()

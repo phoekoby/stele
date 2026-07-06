@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"which java javap 2>/dev/null; java -version 2>&1 | head -1; ls $JAVA_HOME/bin 2>/dev/null | head; find / -name \\\"javap\\\" -type f 2>/dev/null | head -3\",\"description\":\"Locate a JDK javap bi...",
+  "error": "Exit code 143\nCommand timed out after 2m 0s\n/usr/bin/java\n/usr/bin/javap\nThe operation couldn’t be completed. Unable to locate a Java Runtime.\n[\nbash\ncat\nchmod\ncp\ncsh\ndash\ndate\ndd\ndf",
+  "timestamp": "2026-07-06T12:36:59.988Z",
+  "retry_count": 1
+}
