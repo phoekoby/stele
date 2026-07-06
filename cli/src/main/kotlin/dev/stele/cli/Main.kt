@@ -24,6 +24,7 @@ import dev.stele.cli.commands.McpCommand
 import dev.stele.cli.commands.RefineRulesCommand
 import dev.stele.cli.commands.ReviewCommand
 import dev.stele.cli.commands.SearchCommand
+import dev.stele.cli.commands.ServeCommand
 import dev.stele.cli.commands.InitCommand
 import dev.stele.cli.commands.StatsCommand
 import dev.stele.cli.commands.SyncCommand
@@ -60,6 +61,7 @@ fun main(args: Array<String>) =
             DriftCommand(),
             ExplainCommand(),
             GraphCommand(),
+            ServeCommand(),
             EvalCommand(),
             McpCommand(),
             UsageCommand(),

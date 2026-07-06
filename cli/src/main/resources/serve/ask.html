@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stele — ask</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+         background:#0f1117; color:#e6e6e6; display:flex; flex-direction:column; min-height:100vh; }
+  header { padding:14px 22px; border-bottom:1px solid #23262f; display:flex; gap:14px; align-items:baseline; }
+  header h1 { font-size:16px; margin:0; letter-spacing:.4px; }
+  header a { color:#7aa2f7; text-decoration:none; font-size:13px; }
+  main { max-width:860px; width:100%; margin:0 auto; padding:26px 22px; flex:1; }
+  form { display:flex; gap:10px; }
+  input { flex:1; padding:12px 14px; border-radius:10px; border:1px solid #2c3040; background:#171a23; color:#e6e6e6; font-size:15px; }
+  input:focus { outline:none; border-color:#7aa2f7; }
+  button { padding:12px 20px; border-radius:10px; border:none; background:#7aa2f7; color:#0f1117; font-weight:600; cursor:pointer; }
+  button:disabled { opacity:.5; cursor:wait; }
+  .concepts { margin:18px 0 6px; font-size:13px; color:#9aa0b0; }
+  .concepts b { color:#e0af68; }
+  pre { white-space:pre-wrap; background:#171a23; border:1px solid #23262f; border-radius:12px; padding:18px; font-size:14px; }
+  .hint { color:#565f89; font-size:13px; margin-top:10px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Stele · ask the codebase</h1>
+  <a href="/">concept graph →</a>
+</header>
+<main>
+  <form id="f">
+    <input id="q" placeholder="How do refunds work? Can a completed document be deleted? …" autofocus>
+    <button id="go">Ask</button>
+  </form>
+  <div class="concepts" id="c"></div>
+  <pre id="a" hidden></pre>
+  <div class="hint">Answers come in two layers — what the docs say (intent) and what the code does (fact) — with a MISMATCH flag when they disagree.</div>
+</main>
+<script>
+const f = document.getElementById('f'), q = document.getElementById('q'),
+      a = document.getElementById('a'), c = document.getElementById('c'), go = document.getElementById('go');
+f.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!q.value.trim()) return;
+  go.disabled = true; a.hidden = false; a.textContent = 'thinking…'; c.textContent = '';
+  try {
+    const r = await fetch('/api/ask?q=' + encodeURIComponent(q.value));
+    const j = await r.json();
+    c.innerHTML = j.concepts && j.concepts.length ? 'concepts: <b>' + j.concepts.join('</b>, <b>') + '</b>' : '';
+    a.textContent = j.answer || j.error || '(no answer)';
+  } catch (err) { a.textContent = 'request failed: ' + err; }
+  go.disabled = false;
+});
+</script>
+</body>
+</html>
