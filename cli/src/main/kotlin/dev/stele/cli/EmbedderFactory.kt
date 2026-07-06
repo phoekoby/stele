@@ -19,4 +19,17 @@ object EmbedderFactory {
             model ?: cfg?.embedModel ?: "nomic-embed-text",
             ollamaUrl ?: cfg?.ollamaUrl ?: "http://localhost:11434",
         )
+
+    /**
+     * A one-line warning when the active embedder is the offline lexical FLOOR — the
+     * out-of-the-box default runs below the measured nomic numbers, and that must be visible.
+     * Returns null for a real embedding model.
+     */
+    fun floorWarning(embedder: Embedder): String? =
+        if (embedder.name.startsWith("hashing")) {
+            "note: semantic layer is the offline lexical floor (${embedder.name}) — for the measured quality " +
+                "set `embedProvider: ollama` (nomic-embed-text) in stele.yml, then `stele embed`."
+        } else {
+            null
+        }
 }

@@ -487,7 +487,13 @@ class GraphStore(private val conn: Connection) {
         return from + 3
     }
 
-    /** Has this one indexed file changed on disk since it was indexed? (Cheap single-path check for serving.) */
+    /**
+     * Has this one indexed file changed on disk since it was indexed? (Cheap single-path check for serving.)
+     * Only flags a file that EXISTS with a different mtime — a path that doesn't resolve under [repoRoot]
+     * (e.g. a source ingested from OUTSIDE the graph root, whose ref carries a bare `<dirname>/` prefix)
+     * is reported not-stale rather than "stale forever". Incremental staleness assumes sources live under
+     * the graph root (the workspace layout); see the known-gaps note for out-of-tree/codegraph sources.
+     */
     fun isStale(path: String, repoRoot: java.io.File): Boolean {
         val stored = runCatching {
             conn.prepareStatement("SELECT mtime FROM source_files WHERE path = ?").use { st ->
@@ -496,7 +502,7 @@ class GraphStore(private val conn: Connection) {
             }
         }.getOrNull() ?: return false
         val f = java.io.File(repoRoot, path)
-        return !f.exists() || f.lastModified() != stored
+        return f.exists() && f.lastModified() != stored
     }
 
     /** Indexed files whose on-disk mtime no longer matches the index — changed (or removed) since indexing. */

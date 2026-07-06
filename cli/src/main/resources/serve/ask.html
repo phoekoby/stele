@@ -26,7 +26,7 @@
 <body>
 <header>
   <h1>Stele · ask the codebase</h1>
-  <a href="/">concept graph →</a>
+  <a id="graphLink" href="/">concept graph →</a>
 </header>
 <main>
   <form id="f">
@@ -40,14 +40,26 @@
 <script>
 const f = document.getElementById('f'), q = document.getElementById('q'),
       a = document.getElementById('a'), c = document.getElementById('c'), go = document.getElementById('go');
+// A token (if the server requires one) rides in this page's URL; forward it to the API + graph link.
+const token = new URLSearchParams(location.search).get('token');
+if (token) document.getElementById('graphLink').href = '/?token=' + encodeURIComponent(token);
 f.addEventListener('submit', async (e) => {
   e.preventDefault();
   if (!q.value.trim()) return;
   go.disabled = true; a.hidden = false; a.textContent = 'thinking…'; c.textContent = '';
   try {
-    const r = await fetch('/api/ask?q=' + encodeURIComponent(q.value));
+    const url = '/api/ask?q=' + encodeURIComponent(q.value) + (token ? '&token=' + encodeURIComponent(token) : '');
+    const r = await fetch(url);
     const j = await r.json();
-    c.innerHTML = j.concepts && j.concepts.length ? 'concepts: <b>' + j.concepts.join('</b>, <b>') + '</b>' : '';
+    // textContent-only — concept names are never interpreted as HTML (no DOM-XSS).
+    c.textContent = '';
+    if (j.concepts && j.concepts.length) {
+      c.append('concepts: ');
+      j.concepts.forEach((name, i) => {
+        if (i) c.append(', ');
+        const b = document.createElement('b'); b.textContent = name; c.append(b);
+      });
+    }
     a.textContent = j.answer || j.error || '(no answer)';
   } catch (err) { a.textContent = 'request failed: ' + err; }
   go.disabled = false;

@@ -67,7 +67,12 @@ We do not claim answer superiority over vector RAG — the measured claim is *pa
 the citation-grounding, and a significant win over agentic search at a third of its cost*.
 Where the graph should pull ahead — cross-artifact questions, rule/mismatch checks,
 multi-repo routing — is exactly the rule-compliance axis below plus planned next stages.
-Remaining limits: one repo; 29 judged questions; an 8B judge; K=3.
+Remaining limits: one repo, single question-draw authored by us (a second independent
+repo/stack is needed before claiming generalization); 29 judged questions; an 8B judge;
+K=3. The measured numbers use the **nomic** embedder — the out-of-the-box default is the
+offline lexical **floor** (`hashing`), which runs below these numbers (the CLI warns);
+set `embedProvider: ollama` for the measured quality. Ontology quality is model-gated: a
+strong (cloud) LLM for the one-shot `build-ontology`/`drift` steps, local for the rest.
 
 ¹ neither vector RAG nor agentic grep names concepts — compare them on recall/score/cost.
 

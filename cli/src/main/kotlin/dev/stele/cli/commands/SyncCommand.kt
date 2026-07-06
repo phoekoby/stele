@@ -85,6 +85,7 @@ class SyncCommand : CliktCommand(
         val embedder = dev.stele.cli.EmbedderFactory.fromConfig(cfg.llm)
         val (ec, es) = embedAll(store, embedder) { echo(it) }
         echo("embed [${embedder.name}]: $ec concept cards, $es doc sections")
+        dev.stele.cli.EmbedderFactory.floorWarning(embedder)?.let { echo(it) }
 
         conn.close()
         echo("✓ sync complete")
