@@ -73,6 +73,25 @@ after-send) did **not** surface their rule for a natural question — the resolv
 concept or the rule wasn't in the served top-k. Improving question→rule recall is the next retrieval
 work; today the loop only helps when the right rule is actually served.
 
+## Ground-truth check (are the rules real?)
+
+The experiment is only valid if the trap rules are genuinely enforced in Documenso's **real code**
+(not doc marketing) — so that arm B's naive output is a true bug and arm A's guard matches reality.
+Verified against the actual source:
+
+- **T1** — `packages/lib/server-only/document/delete-document.ts`: `import { isDocumentCompleted }`
+  (L11), `if (isDocumentCompleted(envelope.status))` soft-deletes instead of deleting (L146),
+  and the hard-delete path filters `status: { not: COMPLETED }` (L189). The real code enforces it.
+  Arm A independently reproduced this exact `isDocumentCompleted` + soft-delete pattern; arm B's
+  `prisma.document.delete()` would hard-delete a completed document — a genuine bug.
+- **T5** — `packages/lib/server-only/recipient/update-envelope-recipients.ts` throws
+  `'Envelope already complete'` (L76) and `'Cannot modify a recipient who has already interacted
+  with the document'` (L113). Arm A's `status !== 'DRAFT'` guard matches the invariant; arm B's
+  plain update is a genuine bug.
+
+So the served rules are real product invariants the Documenso engineers actually coded — Stele
+surfaced them from the docs, and the small model pulled them and reproduced the real guard.
+
 ## Reproduce
 
 1. Build the Documenso graph (symbols → canonicalize → docs → embed nomic).
