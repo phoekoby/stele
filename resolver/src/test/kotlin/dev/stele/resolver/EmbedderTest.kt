@@ -3,6 +3,7 @@ package dev.stele.resolver
 import dev.stele.core.embed.cosine
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class EmbedderTest {
@@ -12,6 +13,11 @@ class EmbedderTest {
     fun `embedding is L2-normalized so self-cosine is 1`() {
         val v = embedder.embed("authentication login session token")
         assertTrue(cosine(v, v) in 0.999f..1.001f)
+    }
+
+    @Test
+    fun `cosine fails loudly on a dimension mismatch instead of silently truncating`() {
+        assertFailsWith<IllegalArgumentException> { cosine(FloatArray(4096), FloatArray(768)) }
     }
 
     @Test

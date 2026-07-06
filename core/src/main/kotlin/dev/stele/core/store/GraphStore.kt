@@ -27,6 +27,30 @@ import java.util.UUID
  */
 class GraphStore(private val conn: Connection) {
 
+    private var inTx = false
+
+    /**
+     * Run [block] as one atomic unit — a crash mid-way leaves the graph unchanged instead of
+     * half-merged. Reentrant: a nested call joins the outer transaction (so dedupe→deleteConcept
+     * commit together). Also a large SQLite win: one fsync instead of N. Single-connection only.
+     */
+    private fun <T> transaction(block: () -> T): T {
+        if (inTx) return block()
+        conn.autoCommit = false
+        inTx = true
+        try {
+            val result = block()
+            conn.commit()
+            return result
+        } catch (e: Throwable) {
+            runCatching { conn.rollback() }
+            throw e
+        } finally {
+            inTx = false
+            conn.autoCommit = true
+        }
+    }
+
     fun counts(): GraphCounts {
         fun n(table: String): Int =
             conn.createStatement().use { st ->
@@ -272,6 +296,7 @@ class GraphStore(private val conn: Connection) {
         // Group by a normalized key so case + singular/plural twins collapse (Secret/Secrets, Tag/Tags).
         val groups = all.groupBy { normKey(it.name) }.filterValues { it.size > 1 }
         var merged = 0
+        transaction {
         for ((_, group) in groups) {
             val sorted = group.sortedWith(
                 compareByDescending<ConceptRow> { it.hasDef }.thenByDescending { it.edges }.thenBy { it.name.length },
@@ -297,6 +322,7 @@ class GraphStore(private val conn: Connection) {
         }
         // Remove self-loops a merge may have created (e.g. survivor —relates→ its twin).
         conn.prepareStatement("DELETE FROM edges WHERE src_id = dst_id").use { it.executeUpdate() }
+        }
         return DedupeResult(merged, groups.size)
     }
 
@@ -313,8 +339,8 @@ class GraphStore(private val conn: Connection) {
         }
     }
 
-    /** Drop a concept the canonicalizer rejected, along with edges touching it. */
-    fun deleteConcept(id: String) {
+    /** Drop a concept the canonicalizer rejected, along with edges touching it. Atomic. */
+    fun deleteConcept(id: String) = transaction {
         conn.prepareStatement("DELETE FROM edges WHERE src_id = ? OR dst_id = ?").use {
             it.setString(1, id); it.setString(2, id); it.executeUpdate()
         }
@@ -421,16 +447,44 @@ class GraphStore(private val conn: Connection) {
         conn.prepareStatement("DELETE FROM source_files WHERE path = ?").use { it.setString(1, path); it.executeUpdate() }
     }
 
-    /** Drop a file's extracted code artifacts (its FILE node + `code_symbol`s) and every edge touching them. */
-    fun deleteFileArtifacts(path: String) {
-        val ids = "SELECT id FROM artifacts WHERE source = 'code' AND (ref = ? OR ref LIKE ?)"
+    /**
+     * Drop a file's extracted code artifacts (its FILE node + `code_symbol`s) and every edge touching them.
+     * File-scoped: the exact ref plus its `path#symbol` children — the `path#%` pattern is escaped so a
+     * literal `_` in a filename (user_service.go) can't act as a wildcard and delete a sibling file's nodes.
+     * Atomic: the edge-delete and artifact-delete commit together.
+     */
+    fun deleteFileArtifacts(path: String) = transaction {
+        val symbols = likeEsc(path) + "#%"
+        val ids = "SELECT id FROM artifacts WHERE source = 'code' AND (ref = ? OR ref LIKE ? ESCAPE '\\')"
         conn.prepareStatement("DELETE FROM edges WHERE src_id IN ($ids) OR dst_id IN ($ids)").use {
-            it.setString(1, path); it.setString(2, "$path#%"); it.setString(3, path); it.setString(4, "$path#%")
+            it.setString(1, path); it.setString(2, symbols); it.setString(3, path); it.setString(4, symbols)
             it.executeUpdate()
         }
-        conn.prepareStatement("DELETE FROM artifacts WHERE source = 'code' AND (ref = ? OR ref LIKE ?)").use {
-            it.setString(1, path); it.setString(2, "$path#%"); it.executeUpdate()
+        conn.prepareStatement("DELETE FROM artifacts WHERE source = 'code' AND (ref = ? OR ref LIKE ? ESCAPE '\\')").use {
+            it.setString(1, path); it.setString(2, symbols); it.executeUpdate()
         }
+    }
+
+    /**
+     * Escape LIKE metacharacters so a literal path fragment matches literally.
+     * Unescaped `_` (a single-char wildcard) in ubiquitous names like user_service.go was the silent bug.
+     */
+    private fun likeEsc(s: String): String =
+        s.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+    /**
+     * A path-scoped WHERE clause on `<col>` that matches the path exactly, its `path#symbol` children,
+     * and (for a directory path) its `path/…` descendants — anchored to a separator so `apps/auth` never
+     * bleeds into the sibling `apps/authz`. Returns the SQL fragment; bind the 3 params via [bindPathScope].
+     */
+    private fun pathScopeSql(col: String): String =
+        "($col = ? OR $col LIKE ? ESCAPE '\\' OR $col LIKE ? ESCAPE '\\')"
+
+    private fun bindPathScope(st: java.sql.PreparedStatement, from: Int, path: String): Int {
+        st.setString(from, path)
+        st.setString(from + 1, likeEsc(path) + "#%")
+        st.setString(from + 2, likeEsc(path) + "/%")
+        return from + 3
     }
 
     /** Has this one indexed file changed on disk since it was indexed? (Cheap single-path check for serving.) */
@@ -721,12 +775,11 @@ class GraphStore(private val conn: Connection) {
             FROM artifacts a
             JOIN edges e ON e.src_id = a.id AND e.type = 'implements'
             JOIN concepts cc ON cc.id = e.dst_id
-            WHERE a.kind = 'code_symbol' AND (a.ref = ? OR a.ref LIKE ?) AND ${served(Gate.IMPLEMENTS_MIN)}
+            WHERE a.kind = 'code_symbol' AND ${pathScopeSql("a.ref")} AND ${served(Gate.IMPLEMENTS_MIN)}
             ORDER BY cc.name
             """.trimIndent(),
         ).use { st ->
-            st.setString(1, path)
-            st.setString(2, "$path%")
+            bindPathScope(st, 1, path)
             st.executeQuery().use { rs ->
                 while (rs.next()) {
                     val entry = byConcept.getOrPut(rs.getString("id")) { rowToConcept(rs) to mutableListOf() }
@@ -750,25 +803,26 @@ class GraphStore(private val conn: Connection) {
                     buildList { while (rs.next()) add(CallEdge(rs.getString("src"), rs.getString("dst"))) }
                 }
             }
-        val like = "$path%"
+        // 3 bind values per path-scope (exact / path#symbol / path/descendant), anchored + escaped.
+        val scope = listOf(path, likeEsc(path) + "#%", likeEsc(path) + "/%")
         val out = query(
             """
             SELECT s.ref AS src, d.ref AS dst FROM edges e
             JOIN artifacts s ON s.id = e.src_id JOIN artifacts d ON d.id = e.dst_id
-            WHERE e.type = 'calls' AND e.status != 'rejected' AND (s.ref = ? OR s.ref LIKE ?)
+            WHERE e.type = 'calls' AND e.status != 'rejected' AND ${pathScopeSql("s.ref")}
             ORDER BY s.ref LIMIT 40
             """.trimIndent(),
-            path, like,
+            *scope.toTypedArray(),
         )
         val incoming = query(
             """
             SELECT s.ref AS src, d.ref AS dst FROM edges e
             JOIN artifacts s ON s.id = e.src_id JOIN artifacts d ON d.id = e.dst_id
-            WHERE e.type = 'calls' AND e.status != 'rejected' AND (d.ref = ? OR d.ref LIKE ?)
-              AND NOT (s.ref = ? OR s.ref LIKE ?)
+            WHERE e.type = 'calls' AND e.status != 'rejected' AND ${pathScopeSql("d.ref")}
+              AND NOT ${pathScopeSql("s.ref")}
             ORDER BY d.ref LIMIT 40
             """.trimIndent(),
-            path, like, path, like,
+            *scope.toTypedArray(), *scope.toTypedArray(),
         )
         return out to incoming
     }

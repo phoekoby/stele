@@ -17,11 +17,15 @@ interface Embedder {
     fun embedQuery(text: String): FloatArray = embed(text)
 }
 
-/** Cosine of two vectors (dot product — both are expected L2-normalized). */
+/**
+ * Cosine of two vectors (dot product — both are expected L2-normalized).
+ * Fails loudly on a dimension mismatch: silently truncating to the shorter vector
+ * returns a plausible-but-wrong score when a graph mixes embedder models/dims.
+ */
 fun cosine(a: FloatArray, b: FloatArray): Float {
+    require(a.size == b.size) { "cosine on mismatched dims ${a.size} vs ${b.size} — mixed embedder models in the graph?" }
     var dot = 0f
-    val n = minOf(a.size, b.size)
-    for (i in 0 until n) dot += a[i] * b[i]
+    for (i in a.indices) dot += a[i] * b[i]
     return dot
 }
 
