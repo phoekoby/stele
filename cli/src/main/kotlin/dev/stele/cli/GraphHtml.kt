@@ -56,6 +56,12 @@ object GraphHtml {
                 }
             }
         }
+        // Escape HTML-significant chars so a concept name/def/rule containing `</script>`
+        // can't break out of the inlined <script> tag (stored XSS). < etc. parse
+        // back to the same string in JSON.parse, so the viewer is unaffected.
         return Json.encodeToString(JsonObject.serializer(), obj)
+            .replace("<", "\\u003c")
+            .replace(">", "\\u003e")
+            .replace("&", "\\u0026")
     }
 }

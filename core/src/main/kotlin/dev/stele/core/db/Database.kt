@@ -13,6 +13,7 @@ fun openDb(path: String): Connection {
     conn.createStatement().use { st ->
         st.execute("PRAGMA journal_mode=WAL")
         st.execute("PRAGMA foreign_keys=ON")
+        st.execute("PRAGMA busy_timeout=3000") // wait, don't error, if another connection holds a lock (stele serve)
     }
     return conn
 }

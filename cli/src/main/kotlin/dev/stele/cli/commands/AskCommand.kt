@@ -7,6 +7,7 @@ import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.int
 import dev.stele.cli.AskService
+import dev.stele.cli.EmbedderFactory
 import dev.stele.cli.LlmFactory
 import dev.stele.cli.config.ConfigLoader
 import dev.stele.cli.requireDb
@@ -37,6 +38,7 @@ class AskCommand : CliktCommand(
         val conn = openDb(dbFile.path)
         val store = GraphStore(conn)
         val cfg = ConfigLoader.findAndLoad()?.llm
+        EmbedderFactory.floorWarning(EmbedderFactory.fromConfig(cfg))?.let { echo(it, err = true) }
         val started = System.currentTimeMillis()
 
         val llm = if (contextOnly) {
