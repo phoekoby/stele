@@ -50,6 +50,12 @@ McNemar ast-index → Stele: b=6, c=0, p = 0.031 (significant)
 Code structure carries no product rules — the concept layer does. The two axes are
 independent measurements of the same claim.
 
+**Exp1 caveat (negative result, published):** the *delivery mechanic* is not the moat — on
+Documenso's full corpus (159 rules) `cat all_rules.md` in the prompt ties the scoped rule
+(92% = 92% compliance on a modern small model; flat dilution curve). What prompt-stuffing
+cannot do is *produce and maintain* that corpus (rule mining, concept-anchoring, staleness,
+drift audit) — see [`eval/exp1-rule-dilution.md`](eval/exp1-rule-dilution.md).
+
 **Why it works**
 - **The retrieval unit matches the question unit.** Questions are about *concepts*; a concept
   spans docs + code + rules. The ontology resolves the concept first (50-way, 90% hit).
