@@ -76,3 +76,37 @@ rule among 159 just as well as when it is handed exactly one.
 `exp1-workflow.js` (the cell generator; 120 subagent calls) + `exp1-score.py` (checkers +
 curve). Corpus: `sqlite3 .stele/graph.db "SELECT DISTINCT a.title FROM artifacts a JOIN edges e
 ON e.src_id=a.id AND e.type='constrains' WHERE a.kind='rule' AND LENGTH(a.title) BETWEEN 20 AND 160"`.
+
+---
+
+# Exp1b — the sweep: dilution DOES set in, above ~300 rules (crossover found)
+
+Two corrections to exp1, run as a follow-up sweep (`exp1b-workflow.js`):
+1. **Primacy bias fixed.** In exp1 the true rule was always FIRST in the cat list — flattering
+   the cat arms. The sweep places it at a seeded-random position.
+2. **Corpus extended synthetically**: 159 real Documenso rules + ~1000 Haiku-generated
+   distractor rules from 7 fictional SaaS domains → cat300 / cat600 / cat1200 arms.
+
+Same 8 tasks, same checks, K=3, Haiku.
+
+## The full curve (discriminating tasks: T1, T4, T5, T6)
+
+```
+rules in context:   0      1 (stele)   10     40    159¹   159²   300    600    1200
+compliance:         8%       92%      100%   100%   92%    83%    58%    50%    50%
+                             ▲ flat — scoped delivery is corpus-size-independent
+¹ exp1, rule always first (primacy-flattered)   ² shuffled position
+```
+
+## Verdict (upgrades exp1's)
+
+- **Dilution is real — it just starts above Documenso's corpus size.** At 300 rules
+  prompt-stuffing drops to 58%, at 600–1200 it stabilises at ~50%; the scoped arm doesn't
+  move (it always delivers exactly the relevant rule regardless of how many the org has).
+- **Crossover ≈ 200–300 rules = the ICP boundary.** Below it, `cat rules.md` is honestly
+  good enough; above it, scoped delivery wins by **+25–33pp**. One product (Documenso) yields
+  159 rules from public docs alone — a multi-team org's internal corpus lands well past the
+  crossover.
+- Caveats: N=12 per cell on the discriminating subset; synthetic distractors are
+  domain-plausible but not adversarial; single model (Haiku) — weaker models likely cross
+  earlier, stronger later. Directionally clear, worth a bigger-N replication before headline use.
