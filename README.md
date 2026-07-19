@@ -50,6 +50,14 @@ McNemar ast-index → Stele: b=6, c=0, p = 0.031 (significant)
 Code structure carries no product rules — the concept layer does. The two axes are
 independent measurements of the same claim.
 
+**Exp1/1b — the dilution curve (incl. a published negative result):** at Documenso-scale
+corpora (≤159 rules) `cat all_rules.md` in the prompt *ties* the scoped rule — the delivery
+mechanic alone is not a moat there. But dilution sets in above that: at 300 rules
+prompt-stuffing drops to 58%, at 600–1200 to ~50%, while scoped delivery stays flat at 92%
+(**crossover ≈ 200–300 rules — the ICP boundary**). And at any corpus size, prompt-stuffing
+presupposes the curated rules.md that Stele *produces* (rule mining, concept-anchoring,
+staleness, drift audit) — see [`eval/exp1-rule-dilution.md`](eval/exp1-rule-dilution.md).
+
 **Why it works**
 - **The retrieval unit matches the question unit.** Questions are about *concepts*; a concept
   spans docs + code + rules. The ontology resolves the concept first (50-way, 90% hit).
